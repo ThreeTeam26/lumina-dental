@@ -143,6 +143,8 @@ class BookingResponse(BaseModel):
     patient_arrived: bool
     arrived_at: Optional[datetime] = None
     consultation_hint_dismissed: bool = False
+    consultation_registered: bool = False
+    consultation_booking_id: Optional[int] = None
 
     consultation_fee: Optional[float] = None
     payment_method: PaymentMethodEnum

@@ -49,11 +49,15 @@ def is_working_day(d: date, schedule: Schedule | None = None) -> bool:
 
 
 def is_within_working_hours(dt: datetime, schedule: Schedule | None = None) -> bool:
-    """True if `dt` falls within the open/close window for its own day."""
+    """True if `dt` falls within the open/close window for its own day.
+    Handles overnight schedules (e.g. 18:00-02:00), where `closes` is on the
+    following calendar day and so is numerically earlier than `opens`."""
     hours = get_working_hours(dt.date(), schedule)
     if hours is None:
         return False
     opens, closes = hours
+    if closes < opens:
+        return dt.time() >= opens or dt.time() <= closes
     return opens <= dt.time() <= closes
 
 

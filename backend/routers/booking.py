@@ -37,6 +37,8 @@ from services.booking_service import (
     booking_to_public_response,
     get_queue_status,
     confirm_online_payment,
+    record_payment,
+    register_consultation,
     mark_arrival,
     set_consultation_hint,
     set_extra_charge,
@@ -157,6 +159,32 @@ def update_arrival(
     current_user: User = Depends(require_staff),
 ):
     return mark_arrival(db, booking_id, body.arrived, current_user)
+
+
+@router.patch(
+    "/{booking_id}/payment",
+    response_model=BookingResponse,
+    summary="Record the visit's fee as paid (staff)",
+)
+def mark_payment_done(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    return record_payment(db, booking_id, current_user)
+
+
+@router.post(
+    "/{booking_id}/register-consultation",
+    response_model=BookingResponse,
+    summary="Register a follow-up consultation for this visit (staff)",
+)
+def create_consultation_from_booking(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    return register_consultation(db, booking_id, current_user)
 
 
 @router.patch(

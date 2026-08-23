@@ -48,6 +48,8 @@ import {
   fetchPatientBookings,
   updateBookingStatus,
   updateArrivalStatus,
+  recordPayment,
+  registerConsultation,
   updateConsultationHintDismissed,
   updateExtraCharge,
   deleteBooking,
@@ -313,6 +315,8 @@ export default function AdminPage() {
   // Arrival status update state (staff "Mark as Entered" control)
   const [arrivalUpdatingId, setArrivalUpdatingId] = useState<number | null>(null);
   const [arrivalError, setArrivalError] = useState("");
+  const [paymentUpdatingId, setPaymentUpdatingId] = useState<number | null>(null);
+  const [consultationRegisteringId, setConsultationRegisteringId] = useState<number | null>(null);
 
   // Extra charge state (staff add a charge on top of the base appointment —
   // e.g. a crown/filling done during or after the exam).
@@ -569,6 +573,49 @@ export default function AdminPage() {
       );
     } finally {
       setArrivalUpdatingId(null);
+    }
+  };
+
+  // Payment can only be recorded once a booking is confirmed, and never
+  // twice for the same visit — mirrors the backend's own gate in
+  // services/booking_service.py record_payment, so the button's disabled
+  // state matches what the server would actually allow.
+  const canRecordPayment = (b: Booking) => b.status === "confirmed" && b.payment_status !== "paid";
+
+  const handleRecordPayment = async (b: Booking) => {
+    if (!canRecordPayment(b)) return;
+    setArrivalError("");
+    setPaymentUpdatingId(b.id);
+    try {
+      const updated = await recordPayment(token || "", b.id);
+      applyBookingUpdate(updated);
+    } catch (err) {
+      setArrivalError(err instanceof ApiError ? err.message : "Could not record the payment.");
+    } finally {
+      setPaymentUpdatingId(null);
+    }
+  };
+
+  // A consultation can only be registered from a treatment visit (not from
+  // a consultation booking itself) once payment is done and the patient has
+  // checked in — mirrors services/booking_service.py register_consultation.
+  const canRegisterConsultation = (b: Booking) =>
+    !isConsultation(b) && b.payment_status === "paid" && b.patient_arrived === true && !b.consultation_registered;
+
+  const handleRegisterConsultation = async (b: Booking) => {
+    if (!canRegisterConsultation(b)) return;
+    setArrivalError("");
+    setConsultationRegisteringId(b.id);
+    try {
+      await registerConsultation(token || "", b.id);
+      // A brand-new consultation booking was created server-side — reload
+      // so it shows up in the Consultations tab (an optimistic patch to
+      // this one booking wouldn't surface the new row).
+      await loadBookings();
+    } catch (err) {
+      setArrivalError(err instanceof ApiError ? err.message : "Could not register the consultation.");
+    } finally {
+      setConsultationRegisteringId(null);
     }
   };
 
@@ -1169,7 +1216,7 @@ export default function AdminPage() {
     <main className="min-h-screen w-full bg-[#f4f1eb] text-[#101820] selection:bg-[#b99a6b] selection:text-white">
       {/* Top Navbar */}
       <header className="sticky top-0 z-30 bg-[#f4f1eb]/90 backdrop-blur-md border-b border-[#101820]/10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-[#101820] text-[#b99a6b] flex items-center justify-center font-serif font-bold text-lg shadow-sm">
               LD
@@ -1760,14 +1807,24 @@ export default function AdminPage() {
                           {t("admin.common.confirm")}
                         </button>
                         <button
-                          onClick={() => handleStatusChange(b.id, "completed")}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                            b.status === "completed"
+                          onClick={() => handleRecordPayment(b)}
+                          disabled={paymentUpdatingId === b.id || !canRecordPayment(b)}
+                          title={
+                            !canRecordPayment(b) && b.payment_status !== "paid"
+                              ? t("admin.common.paymentDisabledTitle")
+                              : undefined
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                            b.payment_status === "paid"
                               ? "bg-blue-600 text-white shadow"
                               : "bg-[#f4f1eb] text-[#101820]/70 hover:bg-blue-500/10 hover:text-blue-700"
                           }`}
                         >
-                          {t("admin.common.complete")}
+                          {paymentUpdatingId === b.id
+                            ? t("admin.common.updating")
+                            : b.payment_status === "paid"
+                            ? t("admin.common.paymentDone")
+                            : t("admin.common.payment")}
                         </button>
                         <button
                           onClick={() => handleStatusChange(b.id, "cancelled")}
@@ -1813,6 +1870,33 @@ export default function AdminPage() {
                           )}
                         </button>
                       </div>
+
+                      {/* Register a follow-up consultation — enabled once payment is
+                          done and the patient has checked in; creates a real booking
+                          in the Consultations system (see handleRegisterConsultation). */}
+                      {!isConsultation(b) && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleRegisterConsultation(b)}
+                            disabled={consultationRegisteringId === b.id || !canRegisterConsultation(b)}
+                            title={
+                              !canRegisterConsultation(b) && !b.consultation_registered
+                                ? t("admin.common.registerConsultationDisabledTitle")
+                                : undefined
+                            }
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                              b.consultation_registered
+                                ? "bg-[#b99a6b] text-[#101820] shadow"
+                                : "bg-emerald-600 text-white hover:bg-emerald-700 shadow disabled:hover:bg-emerald-600"
+                            }`}
+                          >
+                            <Stethoscope className="w-3.5 h-3.5" />
+                            {consultationRegisteringId === b.id
+                              ? t("admin.common.updating")
+                              : t("admin.common.registerConsultation")}
+                          </button>
+                        </div>
+                      )}
 
                       {/* Consultation toggle — appears once the exam is completed and
                           the patient has a consultation. Flip it on/off (yes/no). */}
@@ -2188,7 +2272,10 @@ export default function AdminPage() {
                             >
                               <option value="pending">🟡 {t("admin.table.statusPending")}</option>
                               <option value="confirmed">🟢 {t("admin.table.statusConfirmed")}</option>
-                              <option value="completed">🔵 {t("admin.table.statusCompleted")}</option>
+                              {/* Retired: "completed" is no longer settable (see change_booking_status
+                                  on the backend) — kept only so a booking that already carries this
+                                  status from before still displays correctly in the dropdown. */}
+                              <option value="completed" disabled>🔵 {t("admin.table.statusCompleted")}</option>
                               <option value="cancelled">🔴 {t("admin.table.statusCancelled")}</option>
                             </select>
                           </td>
@@ -2196,6 +2283,46 @@ export default function AdminPage() {
                           {/* Action Buttons */}
                           <td className="py-4 px-6 text-right rtl:text-left">
                             <div className="flex items-center justify-end rtl:justify-start gap-2">
+                              <button
+                                onClick={() => handleRecordPayment(b)}
+                                disabled={paymentUpdatingId === b.id || !canRecordPayment(b)}
+                                title={
+                                  b.payment_status === "paid"
+                                    ? t("admin.common.paymentDone")
+                                    : !canRecordPayment(b)
+                                    ? t("admin.common.paymentDisabledTitle")
+                                    : t("admin.common.payment")
+                                }
+                                className={`p-2 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                  b.payment_status === "paid"
+                                    ? "bg-blue-500/10 border-blue-500/30 text-blue-700"
+                                    : "bg-[#f4f1eb] hover:bg-blue-500/10 border-[#101820]/10 text-[#101820] hover:text-blue-700"
+                                }`}
+                              >
+                                <Wallet className="w-4 h-4" />
+                              </button>
+
+                              {!isConsultation(b) && (
+                                <button
+                                  onClick={() => handleRegisterConsultation(b)}
+                                  disabled={consultationRegisteringId === b.id || !canRegisterConsultation(b)}
+                                  title={
+                                    b.consultation_registered
+                                      ? t("admin.common.registerConsultation")
+                                      : !canRegisterConsultation(b)
+                                      ? t("admin.common.registerConsultationDisabledTitle")
+                                      : t("admin.common.registerConsultation")
+                                  }
+                                  className={`p-2 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                    b.consultation_registered
+                                      ? "bg-[#b99a6b]/20 border-[#b99a6b]/40 text-[#101820]"
+                                      : "bg-[#f4f1eb] hover:bg-[#b99a6b]/20 border-[#101820]/10 text-[#101820]"
+                                  }`}
+                                >
+                                  <Stethoscope className="w-4 h-4" />
+                                </button>
+                              )}
+
                               <button
                                 onClick={() => setSelectedBooking(b)}
                                 title={t("admin.table.viewDetails")}
@@ -2408,14 +2535,24 @@ export default function AdminPage() {
                           {t("admin.common.confirm")}
                         </button>
                         <button
-                          onClick={() => handleStatusChange(b.id, "completed")}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                            b.status === "completed"
+                          onClick={() => handleRecordPayment(b)}
+                          disabled={paymentUpdatingId === b.id || !canRecordPayment(b)}
+                          title={
+                            !canRecordPayment(b) && b.payment_status !== "paid"
+                              ? t("admin.common.paymentDisabledTitle")
+                              : undefined
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                            b.payment_status === "paid"
                               ? "bg-blue-600 text-white shadow"
                               : "bg-[#f4f1eb] text-[#101820]/70 hover:bg-blue-500/10 hover:text-blue-700"
                           }`}
                         >
-                          {t("admin.common.complete")}
+                          {paymentUpdatingId === b.id
+                            ? t("admin.common.updating")
+                            : b.payment_status === "paid"
+                            ? t("admin.common.paymentDone")
+                            : t("admin.common.payment")}
                         </button>
                         <button
                           onClick={() => handleStatusChange(b.id, "cancelled")}
@@ -2839,14 +2976,24 @@ export default function AdminPage() {
                           {t("admin.common.confirm")}
                         </button>
                         <button
-                          onClick={() => handleStatusChange(visit.id, "completed")}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                            visit.status === "completed"
+                          onClick={() => handleRecordPayment(visit)}
+                          disabled={paymentUpdatingId === visit.id || !canRecordPayment(visit)}
+                          title={
+                            !canRecordPayment(visit) && visit.payment_status !== "paid"
+                              ? t("admin.common.paymentDisabledTitle")
+                              : undefined
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                            visit.payment_status === "paid"
                               ? "bg-blue-600 text-white shadow"
                               : "bg-[#f4f1eb] text-[#101820]/70 hover:bg-blue-500/10 hover:text-blue-800"
                           }`}
                         >
-                          {t("admin.common.complete")}
+                          {paymentUpdatingId === visit.id
+                            ? t("admin.common.updating")
+                            : visit.payment_status === "paid"
+                            ? t("admin.common.paymentDone")
+                            : t("admin.common.payment")}
                         </button>
                         <button
                           onClick={() => handleStatusChange(visit.id, "cancelled")}
@@ -2860,6 +3007,36 @@ export default function AdminPage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Register a follow-up consultation — enabled once payment is
+                        done and the patient has checked in; creates a real booking
+                        in the Consultations system. */}
+                    {!isConsultation(visit) && (
+                      <div className="flex items-center justify-between border-t border-[#101820]/10 pt-2.5 mt-2.5">
+                        <span className="text-[0.65rem] text-[#101820]/50 uppercase tracking-wider">
+                          {t("admin.common.registerConsultation")}
+                        </span>
+                        <button
+                          onClick={() => handleRegisterConsultation(visit)}
+                          disabled={consultationRegisteringId === visit.id || !canRegisterConsultation(visit)}
+                          title={
+                            !canRegisterConsultation(visit) && !visit.consultation_registered
+                              ? t("admin.common.registerConsultationDisabledTitle")
+                              : undefined
+                          }
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                            visit.consultation_registered
+                              ? "bg-[#b99a6b] text-[#101820] shadow"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700 shadow disabled:hover:bg-emerald-600"
+                          }`}
+                        >
+                          <Stethoscope className="w-3.5 h-3.5" />
+                          {consultationRegisteringId === visit.id
+                            ? t("admin.common.updating")
+                            : t("admin.common.registerConsultation")}
+                        </button>
+                      </div>
+                    )}
 
                     {(visit.branch_name || visit.updated_by) && (
                       <div className="flex items-center gap-3 border-t border-[#101820]/10 pt-2.5 mt-2.5 text-[0.65rem] text-[#101820]/45">

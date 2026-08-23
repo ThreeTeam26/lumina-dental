@@ -15,6 +15,7 @@ from core.crud.booking import (
     create_booking_with_queue_number,
     find_active_booking_for_phone,
     count_active_bookings_for_date,
+    get_max_queue_number_for_date,
     count_patients_ahead,
     get_currently_serving,
     get_booking as crud_get,
@@ -34,7 +35,14 @@ from core.crud.branch import get_branch
 from core.database import Booking, BookingStatus, PaymentMethod, PaymentStatus, ServiceType, User
 from core.clinic_schedule import get_working_hours, is_working_day, is_within_working_hours, branch_working_hours
 from core.config import settings
-from schemas.booking import BookingCreate, BookingStatusUpdate, ExtraChargeUpdate, MedicalRecordUpdate, ServiceTypeEnum
+from schemas.booking import (
+    BookingCreate,
+    BookingStatusEnum,
+    BookingStatusUpdate,
+    ExtraChargeUpdate,
+    MedicalRecordUpdate,
+    ServiceTypeEnum,
+)
 
 # Treatments must match the frontend constants
 VALID_TREATMENTS = {
@@ -130,13 +138,18 @@ def get_availability(db: Session, date_str: str, branch_id: int | None = None):
         }
 
     patients_booked = count_active_bookings_for_date(db, date_str, branch_id)
+    # The number an actual booking would be assigned right now (see
+    # create_booking_with_queue_number) — based on the highest number ever
+    # handed out that day, not the active count, so this preview never
+    # promises a number that's already taken by an earlier cancelled booking.
+    next_queue_number = get_max_queue_number_for_date(db, date_str, branch_id) + 1
     return {
         "date": date_str,
         "is_working_day": True,
         "opens": hours[0].strftime("%H:%M"),
         "closes": hours[1].strftime("%H:%M"),
         "patients_booked": patients_booked,
-        "next_queue_number": patients_booked + 1,
+        "next_queue_number": next_queue_number,
         "reason": None,
     }
 
@@ -215,6 +228,10 @@ def validate_and_create_booking(db: Session, data: BookingCreate) -> Booking:
     # guarantee is the retry loop + DB constraint in the CRUD layer).
     hours = get_working_hours(booking_date, schedule)
     close_dt = datetime.combine(booking_date, hours[1])
+    if hours[1] < hours[0]:
+        # Overnight schedule (e.g. 18:00-02:00): closing time is on the
+        # following calendar day, not the same day as opening.
+        close_dt += timedelta(days=1)
     now = datetime.now()
     projected_ahead = count_active_bookings_for_date(db, data.date, data.branch_id)
     projected_start, _ = _estimate_window(booking_date, projected_ahead, now, schedule)
@@ -328,6 +345,111 @@ def _stamp_audit(db: Session, booking: Booking, current_user: User) -> Booking:
     return booking
 
 
+def record_payment(db: Session, booking_id: int, current_user: User) -> Booking:
+    """Staff confirms the visit's fee was paid (in person at the clinic, or
+    an online booking staff is settling manually — payment_method is not
+    restricted here, unlike confirm_online_payment above).
+
+    Enforces the workflow rule: a booking must already be confirmed before
+    payment can be recorded, and the same visit can never be paid twice.
+    """
+    booking = crud_get(db, booking_id)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if booking.status != BookingStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The appointment must be confirmed before payment can be recorded.",
+        )
+    if booking.payment_status == PaymentStatus.PAID:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Payment has already been recorded for this visit.",
+        )
+    booking = crud_set_payment_paid(db, booking_id)
+    return _stamp_audit(db, booking, current_user)
+
+
+def register_consultation(db: Session, booking_id: int, current_user: User) -> Booking:
+    """Staff registers a follow-up consultation for this visit. Creates a
+    real service_type=CONSULTATION Booking for the same patient — through
+    the same queue-assignment path a patient's own booking would use — and
+    links it back onto this visit so it can't be registered twice.
+
+    Enforces the workflow rule: payment must be recorded and the patient
+    must be checked in before a consultation can be registered.
+    """
+    booking = crud_get(db, booking_id)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if booking.service_type == ServiceType.CONSULTATION:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This booking is already a consultation.",
+        )
+    if booking.payment_status != PaymentStatus.PAID:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Payment must be recorded before a consultation can be registered.",
+        )
+    if not booking.patient_arrived:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The patient must be checked in before a consultation can be registered.",
+        )
+    if booking.consultation_registered:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A consultation has already been registered for this visit.",
+        )
+
+    branch = booking.branch
+    schedule = branch_working_hours(branch)
+
+    # Land the consultation on the next day the clinic (or this branch) is
+    # actually open, starting today.
+    consultation_date = date.today()
+    for _ in range(8):
+        if is_working_day(consultation_date, schedule):
+            break
+        consultation_date += timedelta(days=1)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Could not find an open day to schedule the consultation.",
+        )
+
+    now = datetime.now()
+
+    def estimate_fn(patients_ahead: int):
+        return _estimate_window(consultation_date, patients_ahead, now, schedule)
+
+    fee = get_consultation_fee(db)
+    if branch is not None and branch.consultation_price is not None:
+        fee = branch.consultation_price
+
+    consultation_booking = create_booking_with_queue_number(
+        db,
+        estimate_fn,
+        full_name=booking.full_name,
+        phone=booking.phone,
+        email=booking.email,
+        treatment=CONSULTATION_LABEL,
+        service_type=ServiceType.CONSULTATION,
+        date=consultation_date.isoformat(),
+        time=None,
+        message=None,
+        consultation_fee=fee,
+        branch_id=booking.branch_id,
+        payment_method=PaymentMethod.CLINIC,
+        payment_status=PaymentStatus.PENDING,
+    )
+
+    booking.consultation_registered = True
+    booking.consultation_booking_id = consultation_booking.id
+    return _stamp_audit(db, booking, current_user)
+
+
 def mark_arrival(db: Session, booking_id: int, arrived: bool, current_user: User) -> Booking:
     booking = crud_get(db, booking_id)
     if booking is None:
@@ -365,6 +487,18 @@ def set_consultation_hint(db: Session, booking_id: int, dismissed: bool, current
 
 
 def change_booking_status(db: Session, booking_id: int, update: BookingStatusUpdate, current_user: User):
+    # "completed" was a manual staff action (the old "Complete" button); it's
+    # been fully retired in favor of the payment + consultation-registration
+    # workflow (see record_payment/register_consultation above), so no new
+    # transition to it is accepted here — checked server-side so it can't be
+    # reached by calling this endpoint directly, even though the frontend no
+    # longer offers a way to select it either. Bookings that already carry
+    # this status from before are untouched and keep displaying correctly.
+    if update.status == BookingStatusEnum.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The 'completed' status can no longer be set directly.",
+        )
     booking = crud_update_status(db, booking_id, BookingStatus(update.status.value))
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")

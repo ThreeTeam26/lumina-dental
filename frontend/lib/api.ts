@@ -28,6 +28,8 @@ export interface Booking {
   patient_arrived: boolean;
   arrived_at?: string | null;
   consultation_hint_dismissed?: boolean;
+  consultation_registered?: boolean;
+  consultation_booking_id?: number | null;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   reminder_status: ReminderStatus;
@@ -388,6 +390,36 @@ export async function updateArrivalStatus(token: string, bookingId: number, arri
     body: JSON.stringify({ arrived }),
   });
   if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not update arrival status."), res.status);
+  return res.json();
+}
+
+/**
+ * Staff records the visit's fee as paid (in-clinic payment). The backend
+ * requires the booking to already be confirmed and refuses to record
+ * payment twice for the same visit — both enforced server-side, not just
+ * by disabling the button.
+ */
+export async function recordPayment(token: string, bookingId: number): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/payment`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not record the payment."), res.status);
+  return res.json();
+}
+
+/**
+ * Staff registers a follow-up consultation for this visit — creates a real
+ * booking in the Consultations system. The backend requires payment to be
+ * recorded and the patient checked in first, and refuses to register a
+ * second consultation for the same visit.
+ */
+export async function registerConsultation(token: string, bookingId: number): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/register-consultation`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not register the consultation."), res.status);
   return res.json();
 }
 

@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from datetime import datetime, timezone
 import enum
+import logging
 
 from core.config import settings
 
@@ -82,6 +83,17 @@ class Booking(Base):
     # claim queue_number=1 and collide. See _migrate_booking_queue_constraint()
     # for how an existing database.db gets upgraded to this (SQLite can't
     # ALTER a table to change a composite UNIQUE constraint in place).
+    #
+    # NOTE: this plain UniqueConstraint does NOT actually protect bookings
+    # with branch_id IS NULL (the "no branch configured" case) — ANSI SQL
+    # treats every NULL as distinct from every other NULL for uniqueness
+    # purposes, so SQLite happily accepts two rows that are otherwise
+    # identical whenever branch_id is NULL on both. The real, NULL-safe
+    # guarantee comes from the COALESCE-based expression UNIQUE INDEX built
+    # in _migrate_booking_queue_null_safety() below, which every insert path
+    # is actually protected by. This table-level constraint is left in place
+    # only because it already exists in deployed databases and still helps
+    # for the (more common) case where branch_id is set.
     __table_args__ = (
         UniqueConstraint("date", "branch_id", "queue_number", name="uq_booking_date_branch_queue"),
     )
@@ -110,6 +122,13 @@ class Booking(Base):
     # is shown on a completed exam. Purely a UI hint — dismissing it never
     # touches the consultation booking itself.
     consultation_hint_dismissed = Column(Boolean, default=False, nullable=False)
+
+    # Staff registered a follow-up consultation from this visit (see
+    # services/booking_service.py register_consultation) — a real
+    # service_type=CONSULTATION Booking gets created and linked here. Once
+    # True, this visit can't spawn a second consultation.
+    consultation_registered = Column(Boolean, default=False, nullable=False)
+    consultation_booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)
 
     # ── Payment ───────────────────────────────────────────────────────────
     # Base visit fee quoted to the patient at booking time — a snapshot of the
@@ -314,6 +333,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _migrate_missing_columns()
     _migrate_booking_queue_constraint()
+    _migrate_booking_queue_null_safety()
     _migrate_legacy_medical_record_fields()
     _seed_default_users()
 
@@ -351,7 +371,7 @@ def _migrate_missing_columns() -> None:
                     continue
                 col_type = column.type.compile(dialect=engine.dialect)
                 default_clause = ""
-                if column.name in ("patient_arrived", "consultation_hint_dismissed", "extra_charge_paid", "follow_up_needed"):
+                if column.name in ("patient_arrived", "consultation_hint_dismissed", "extra_charge_paid", "follow_up_needed", "consultation_registered"):
                     default_clause = " DEFAULT 0"
                 elif column.name == "service_type":
                     # SAEnum stores the member NAME (e.g. existing rows hold
@@ -393,6 +413,40 @@ def _migrate_booking_queue_constraint() -> None:
         columns = ", ".join(f'"{c.name}"' for c in Booking.__table__.columns)
         conn.execute(text(f"INSERT INTO bookings ({columns}) SELECT {columns} FROM bookings_old_uq_migration"))
         conn.execute(text("DROP TABLE bookings_old_uq_migration"))
+
+
+def _migrate_booking_queue_null_safety() -> None:
+    """Close a gap the plain UniqueConstraint above can't cover: ANSI SQL
+    never treats two NULLs as equal for uniqueness, so on a booking with no
+    branch (branch_id IS NULL — the common case for a clinic that hasn't set
+    up branches) SQLite silently allows duplicate (date, queue_number) rows.
+    Confirmed live: concurrent booking requests with no branch_id can each
+    get committed with the identical queue number, since the DB never even
+    raises the IntegrityError the retry-on-conflict loop in
+    create_booking_with_queue_number depends on to detect the collision.
+
+    A UNIQUE INDEX on an expression that maps NULL to a real sentinel value
+    closes this — SQLite (3.9+) fully supports indexing an expression, not
+    just a bare column, and -1 always equals -1. Safe to (re-)run on every
+    startup. If rows created before this fix already collide, index
+    creation fails; that's logged instead of crashing startup so the app
+    stays usable while it's investigated."""
+    inspector = inspect(engine)
+    if "bookings" not in inspector.get_table_names():
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_booking_queue_null_safe "
+                "ON bookings (date, COALESCE(branch_id, -1), queue_number)"
+            ))
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "Could not create the NULL-safe booking queue-number index — "
+            "the table likely already has duplicate (date, branch_id, "
+            "queue_number) rows from before this fix that need manual "
+            "resolution before real duplicate-booking protection is active."
+        )
 
 
 def _migrate_legacy_medical_record_fields() -> None:

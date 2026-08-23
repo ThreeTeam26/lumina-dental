@@ -77,6 +77,23 @@ def count_active_bookings_for_date(db: Session, date: str, branch_id: int | None
     )
 
 
+def get_max_queue_number_for_date(db: Session, date: str, branch_id: int | None = None) -> int:
+    """Highest queue_number ever handed out for this date at this branch,
+    across every booking regardless of status. Cancelled bookings still
+    permanently occupy their number (the DB's uniqueness constraint doesn't
+    care about status, and numbers are never recycled), so the *next*
+    number must be based on this — not on how many bookings are still
+    active, which undercounts whenever a cancellation leaves a gap earlier
+    in the day's sequence and collides with a later, still-active booking's
+    number."""
+    return (
+        db.query(func.max(Booking.queue_number))
+        .filter(Booking.date == date, Booking.branch_id == branch_id)
+        .scalar()
+        or 0
+    )
+
+
 def count_patients_ahead(db: Session, date: str, queue_number: int, branch_id: int | None = None) -> int:
     """How many bookings before `queue_number` on `date`, at the same branch,
     still haven't been served or cancelled — i.e. actually still ahead in
@@ -116,12 +133,18 @@ def create_booking_with_queue_number(db: Session, estimate_fn, **kwargs) -> Book
     the booking — each branch runs its own queue, so "first booking of the
     day" at every branch is #1.
 
+    The assigned number is based on the highest number ever handed out that
+    day (see get_max_queue_number_for_date) — never on how many bookings are
+    still active, which would collide as soon as an earlier booking gets
+    cancelled and leaves a gap. `patients_ahead` (a separate, active-only
+    count) only ever feeds the wait-time estimate, never the number itself.
+
     Two patients booking at the same moment (at the same branch) could both
     read the same "current max" queue number before either commits. We
     guard against that with a retry-on-conflict loop backed by the DB-level
     unique constraint on (date, branch_id, queue_number) — whichever
     request commits first wins that number, the loser recomputes the next
-    number and retries.
+    number (now reflecting the winner's row) and retries.
 
     `estimate_fn(patients_ahead) -> (start, end)` is recomputed on every
     attempt so the stored estimate always matches the queue number that
@@ -133,7 +156,7 @@ def create_booking_with_queue_number(db: Session, estimate_fn, **kwargs) -> Book
 
     for _ in range(MAX_QUEUE_ASSIGN_ATTEMPTS):
         patients_ahead = count_active_bookings_for_date(db, date, branch_id)
-        next_number = patients_ahead + 1
+        next_number = get_max_queue_number_for_date(db, date, branch_id) + 1
         estimated_start, estimated_end = estimate_fn(patients_ahead)
         booking = Booking(
             **kwargs,
