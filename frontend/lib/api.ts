@@ -72,9 +72,16 @@ export interface BookingConfirmation {
   estimated_arrival_start?: string | null;
   estimated_arrival_end?: string | null;
   consultation_fee?: number | null;
+  branch_id?: number | null;
   branch_name?: string | null;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+}
+
+/** Result of the public active-booking lookup (GET /bookings/active). */
+export interface ActiveBookingResult {
+  has_active_booking: boolean;
+  booking: BookingConfirmation | null;
 }
 
 export interface QueueStatus {
@@ -295,6 +302,42 @@ export async function submitBooking(data: BookingCreateData): Promise<BookingCon
   if (!res.ok) {
     throw new ApiError(await parseErrorDetail(res, "Could not complete your booking."), res.status);
   }
+  return res.json();
+}
+
+/**
+ * Look up the patient's current active booking by phone (public). Lets the
+ * booking form show an existing booking the patient can manage instead of
+ * surfacing the one-active-per-phone rule as an error.
+ */
+export async function getActiveBooking(phone: string): Promise<ActiveBookingResult> {
+  const res = await fetch(`${API_BASE_URL}/bookings/active?phone=${encodeURIComponent(phone)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not check your booking."), res.status);
+  return res.json();
+}
+
+/** Change the date of the patient's existing booking (public). `phone` proves
+ * ownership. The backend re-validates the date and reassigns the queue number. */
+export async function rescheduleBooking(bookingId: number, date: string, phone: string): Promise<BookingConfirmation> {
+  const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/reschedule`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ date, phone }),
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not change your booking date."), res.status);
+  return res.json();
+}
+
+/** Cancel the patient's existing booking (public). `phone` proves ownership. */
+export async function cancelBooking(bookingId: number, phone: string): Promise<BookingConfirmation> {
+  const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not cancel your booking."), res.status);
   return res.json();
 }
 

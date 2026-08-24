@@ -13,7 +13,9 @@ from fastapi import HTTPException, status
 
 from core.crud.booking import (
     create_booking_with_queue_number,
+    reschedule_booking_with_queue_number,
     find_active_booking_for_phone,
+    _phones_match,
     count_active_bookings_for_date,
     get_max_queue_number_for_date,
     count_patients_ahead,
@@ -30,6 +32,7 @@ from core.crud.booking import (
     get_bookings_by_phone as crud_get_by_phone,
     delete_booking as crud_delete,
 )
+from core.crud.booking import STILL_WAITING_STATUSES
 from core.crud.setting import get_consultation_fee
 from core.crud.branch import get_branch
 from core.database import Booking, BookingStatus, PaymentMethod, PaymentStatus, ServiceType, User
@@ -154,6 +157,48 @@ def get_availability(db: Session, date_str: str, branch_id: int | None = None):
     }
 
 
+def _validate_booking_date(db: Session, date_str: str, branch_id: int | None, schedule) -> date:
+    """Shared date validation for both new bookings and reschedules: not in the
+    past, an open day at this branch, inside the booking window, and not past
+    the day's capacity. Returns the parsed date; raises HTTPException otherwise."""
+    booking_date = _parse_date(date_str)
+    today = date.today()
+
+    if booking_date < today:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Booking date cannot be in the past.",
+        )
+    if not is_working_day(booking_date, schedule):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"The clinic is closed on {WEEKDAY_NAMES[booking_date.weekday()]}s. Please choose a working day.",
+        )
+    if (booking_date - today).days > settings.BOOKING_WINDOW_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Bookings can only be made up to {settings.BOOKING_WINDOW_DAYS} days in advance.",
+        )
+
+    # Best-effort capacity check (soft — the authoritative uniqueness guarantee
+    # is the retry loop + DB constraint in the CRUD layer).
+    hours = get_working_hours(booking_date, schedule)
+    close_dt = datetime.combine(booking_date, hours[1])
+    if hours[1] < hours[0]:
+        # Overnight schedule (e.g. 18:00-02:00): closing time is on the
+        # following calendar day, not the same day as opening.
+        close_dt += timedelta(days=1)
+    now = datetime.now()
+    projected_ahead = count_active_bookings_for_date(db, date_str, branch_id)
+    projected_start, _ = _estimate_window(booking_date, projected_ahead, now, schedule)
+    if projected_start >= close_dt:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{date_str} is fully booked for the day. Please choose another date.",
+        )
+    return booking_date
+
+
 def validate_and_create_booking(db: Session, data: BookingCreate) -> Booking:
     """Validate business rules then persist a new booking with a
     backend-assigned, per-day-unique queue number."""
@@ -203,43 +248,8 @@ def validate_and_create_booking(db: Session, data: BookingCreate) -> Booking:
             )
     schedule = branch_working_hours(branch)
 
-    booking_date = _parse_date(data.date)
-    today = date.today()
-
-    if booking_date < today:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Booking date cannot be in the past.",
-        )
-
-    if not is_working_day(booking_date, schedule):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"The clinic is closed on {WEEKDAY_NAMES[booking_date.weekday()]}s. Please choose a working day.",
-        )
-
-    if (booking_date - today).days > settings.BOOKING_WINDOW_DAYS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Bookings can only be made up to {settings.BOOKING_WINDOW_DAYS} days in advance.",
-        )
-
-    # Best-effort capacity check (soft — the authoritative uniqueness
-    # guarantee is the retry loop + DB constraint in the CRUD layer).
-    hours = get_working_hours(booking_date, schedule)
-    close_dt = datetime.combine(booking_date, hours[1])
-    if hours[1] < hours[0]:
-        # Overnight schedule (e.g. 18:00-02:00): closing time is on the
-        # following calendar day, not the same day as opening.
-        close_dt += timedelta(days=1)
+    booking_date = _validate_booking_date(db, data.date, data.branch_id, schedule)
     now = datetime.now()
-    projected_ahead = count_active_bookings_for_date(db, data.date, data.branch_id)
-    projected_start, _ = _estimate_window(booking_date, projected_ahead, now, schedule)
-    if projected_start >= close_dt:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"{data.date} is fully booked for the day. Please choose another date.",
-        )
 
     def estimate_fn(patients_ahead: int):
         return _estimate_window(booking_date, patients_ahead, now, schedule)
@@ -282,10 +292,77 @@ def booking_to_public_response(db: Session, booking: Booking) -> dict:
         "estimated_arrival_start": booking.estimated_arrival_start,
         "estimated_arrival_end": booking.estimated_arrival_end,
         "consultation_fee": booking.consultation_fee,
+        "branch_id": booking.branch_id,
         "branch_name": booking.branch_name,
         "payment_method": booking.payment_method,
         "payment_status": booking.payment_status,
     }
+
+
+def get_active_booking_for_phone(db: Session, phone: str) -> dict:
+    """Public: the patient's current active (pending/confirmed) booking, if any,
+    in the same safe, patient-facing shape as a booking confirmation. This turns
+    the one-active-per-phone rule from an error into something the patient can
+    see and manage before booking again."""
+    existing = find_active_booking_for_phone(db, phone)
+    if existing is None:
+        return {"has_active_booking": False, "booking": None}
+    return {"has_active_booking": True, "booking": booking_to_public_response(db, existing)}
+
+
+def _owned_active_booking(db: Session, booking_id: int, phone: str) -> Booking:
+    """Fetch a booking for a public self-service action, checking the phone owns
+    it — reusing the existing tolerant phone matching (no second matching
+    system), the same ownership posture as confirm_online_payment."""
+    booking = crud_get(db, booking_id)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    if not _phones_match(booking.phone, phone):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Phone number does not match this booking.",
+        )
+    return booking
+
+
+def reschedule_booking(db: Session, booking_id: int, new_date: str, phone: str) -> Booking:
+    """Public: move the patient's existing active booking to a new date instead
+    of creating a duplicate. Validates the new date against the booking's own
+    branch schedule / window / capacity and assigns a fresh queue number +
+    estimate for it — never a second active booking."""
+    booking = _owned_active_booking(db, booking_id, phone)
+    if booking.status not in STILL_WAITING_STATUSES:
+        # Cancelled/completed between the patient's lookup and this call.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This booking can no longer be changed.",
+        )
+    if new_date == booking.date:
+        return booking  # no change requested — keep the existing number/estimate
+
+    schedule = branch_working_hours(booking.branch)
+    booking_date = _validate_booking_date(db, new_date, booking.branch_id, schedule)
+    now = datetime.now()
+
+    def estimate_fn(patients_ahead: int):
+        return _estimate_window(booking_date, patients_ahead, now, schedule)
+
+    return reschedule_booking_with_queue_number(db, booking, estimate_fn, new_date)
+
+
+def cancel_booking_public(db: Session, booking_id: int, phone: str) -> Booking:
+    """Public: cancel the patient's own booking through the existing status
+    mechanism (never a hard delete). A cancelled booking no longer counts as
+    active, so the patient can immediately book again."""
+    booking = _owned_active_booking(db, booking_id, phone)
+    if booking.status == BookingStatus.CANCELLED:
+        return booking  # idempotent — already cancelled
+    if booking.status == BookingStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A completed booking cannot be cancelled.",
+        )
+    return crud_update_status(db, booking_id, BookingStatus.CANCELLED)
 
 
 def get_queue_status(db: Session, booking_id: int) -> dict:

@@ -31,13 +31,16 @@ import {
   WorkingHours,
   confirmOnlinePayment,
   getAvailability,
+  getActiveBooking,
+  rescheduleBooking,
+  cancelBooking,
   getClinicSchedule,
   getQueueStatus,
   listPublicBranches,
   submitBooking,
 } from "@/lib/api";
 
-type Step = "branch" | "date" | "details" | "payment" | "online" | "confirmed";
+type Step = "branch" | "date" | "details" | "existing" | "payment" | "online" | "confirmed";
 
 type Fields = {
   fullName: string;
@@ -194,6 +197,21 @@ export default function BookingPage() {
   const [payingOnline, setPayingOnline] = useState(false);
   const [payError, setPayError] = useState("");
 
+  // ── Existing active booking management ──────────────────────────────────
+  // When the entered phone already has an active booking, we surface it (via
+  // the "existing" step) so the patient can keep / reschedule / cancel it,
+  // instead of the one-active-per-phone rule showing up as a red error.
+  const [activeBooking, setActiveBooking] = useState<BookingConfirmation | null>(null);
+  const activeCheckId = useRef(0);
+  const [existingMode, setExistingMode] = useState<"actions" | "changeDate" | "confirmCancel">("actions");
+  const [existingBusy, setExistingBusy] = useState(false);
+  const [existingError, setExistingError] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newDateAvail, setNewDateAvail] = useState<Availability | null>(null);
+  const [checkingNewDate, setCheckingNewDate] = useState(false);
+  const [newDateError, setNewDateError] = useState("");
+  const newDateCheckId = useRef(0);
+
   const successRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -260,6 +278,29 @@ export default function BookingPage() {
       clearInterval(interval);
     };
   }, [step, confirmation]);
+
+  // As soon as the patient has typed a plausible phone in the details step,
+  // check (debounced) whether it already has an active booking — if so, show
+  // the existing booking instead of letting them create a duplicate. A failed
+  // lookup is intentionally silent: the backend re-checks on submit, so we
+  // never wrongly assume "no booking" on a transient error.
+  useEffect(() => {
+    if (step !== "details") return;
+    const digits = fields.phone.replace(/\D/g, "");
+    if (digits.length < 7) return;
+    const handle = setTimeout(async () => {
+      const requestId = ++activeCheckId.current;
+      try {
+        const res = await getActiveBooking(fields.phone);
+        if (requestId !== activeCheckId.current) return;
+        if (res.has_active_booking && res.booking) showExistingBooking(res.booking);
+      } catch {
+        /* silent — authoritative check happens again on submit */
+      }
+    }, 600);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields.phone, step]);
 
   const selectedBranch = useMemo(
     () => branches.find((b) => String(b.id) === fields.branchId) ?? null,
@@ -368,6 +409,21 @@ export default function BookingPage() {
       setConfirmation(result);
       setStep(paymentMethod === "online" ? "online" : "confirmed");
     } catch (err) {
+      // A 409 at submit time is (almost always) a concurrent active booking for
+      // this phone — fetch it and show the manage-booking UI instead of the raw
+      // backend message. (If there's no active booking, it was another 409 such
+      // as a full date, so we fall through to the generic error.)
+      if (err instanceof ApiError && err.status === 409) {
+        try {
+          const res = await getActiveBooking(fields.phone);
+          if (res.has_active_booking && res.booking) {
+            showExistingBooking(res.booking);
+            return;
+          }
+        } catch {
+          /* fall through to the generic error below */
+        }
+      }
       setSubmitError(err instanceof ApiError ? err.message : t("site.booking.bookingError"));
     } finally {
       setSubmitting(false);
@@ -402,6 +458,107 @@ export default function BookingPage() {
     setPayError("");
   };
 
+  // ── Existing-booking management handlers ────────────────────────────────
+  function showExistingBooking(b: BookingConfirmation) {
+    setActiveBooking(b);
+    setExistingMode("actions");
+    setExistingError("");
+    setNewDate("");
+    setNewDateAvail(null);
+    setNewDateError("");
+    setStep("existing");
+  }
+
+  const handleKeepBooking = () => {
+    if (!activeBooking) return;
+    setConfirmation(activeBooking);
+    setStep("confirmed");
+  };
+
+  const handleNewDateChange = async (value: string) => {
+    setNewDate(value);
+    setNewDateError("");
+    setNewDateAvail(null);
+    if (!value) return;
+    const requestId = ++newDateCheckId.current;
+    setCheckingNewDate(true);
+    try {
+      const av = await getAvailability(value, activeBooking?.branch_id ?? undefined);
+      if (requestId !== newDateCheckId.current) return;
+      setNewDateAvail(av);
+      if (!av.is_working_day || av.reason) setNewDateError(av.reason || t("site.booking.dateNotAvailable"));
+    } catch (e) {
+      if (requestId !== newDateCheckId.current) return;
+      setNewDateError(e instanceof ApiError ? e.message : t("site.booking.availabilityCheckError"));
+    } finally {
+      if (requestId === newDateCheckId.current) setCheckingNewDate(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (
+      !activeBooking ||
+      !newDate ||
+      !newDateAvail ||
+      newDateError ||
+      newDateAvail.date !== newDate ||
+      newDateAvail.next_queue_number === null
+    )
+      return;
+    setExistingBusy(true);
+    setNewDateError("");
+    try {
+      const updated = await rescheduleBooking(activeBooking.id, newDate, fields.phone);
+      setActiveBooking(null);
+      setConfirmation(updated);
+      setStep("confirmed");
+    } catch (e) {
+      // The booking may have been cancelled/completed since it was looked up —
+      // refresh and route the patient appropriately instead of getting stuck.
+      if (e instanceof ApiError && (e.status === 404 || e.status === 409)) {
+        try {
+          const res = await getActiveBooking(fields.phone);
+          if (res.has_active_booking && res.booking) {
+            showExistingBooking(res.booking);
+            return;
+          }
+          setActiveBooking(null);
+          setStep("details");
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
+      setNewDateError(e instanceof ApiError ? e.message : t("site.booking.rescheduleError"));
+    } finally {
+      setExistingBusy(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!activeBooking) return;
+    setExistingBusy(true);
+    setExistingError("");
+    try {
+      await cancelBooking(activeBooking.id, fields.phone);
+      setActiveBooking(null);
+      setExistingMode("actions");
+      // Cancelled — no longer blocks the phone. Continue the normal flow with
+      // the details already entered so the patient can book again immediately.
+      setStep("details");
+    } catch (e) {
+      // Already cancelled/gone -> treat as success and continue.
+      if (e instanceof ApiError && e.status === 404) {
+        setActiveBooking(null);
+        setStep("details");
+        return;
+      }
+      setExistingError(e instanceof ApiError ? e.message : t("site.booking.cancelError"));
+    } finally {
+      setExistingBusy(false);
+    }
+  };
+
   const err = (key: keyof Fields) =>
     errors[key] ? (
       <p role="alert" className="mt-1.5 text-xs text-[#a83b2d]">
@@ -433,7 +590,8 @@ export default function BookingPage() {
           {/* Step indicator */}
           <ol className="mt-10 flex items-center gap-2 sm:gap-4">
             {STEPS.map((s, i) => {
-              const currentIndex = STEPS.findIndex((x) => x.id === (step === "online" ? "payment" : step));
+              const indicatorStep = step === "online" ? "payment" : step === "existing" ? "details" : step;
+              const currentIndex = STEPS.findIndex((x) => x.id === indicatorStep);
               const isActive = i === currentIndex;
               const isDone = i < currentIndex;
               return (
@@ -751,6 +909,194 @@ export default function BookingPage() {
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* ── STEP 2b: EXISTING ACTIVE BOOKING (manage instead of error) ──── */}
+            {step === "existing" && activeBooking && (
+              <div className="space-y-6">
+                <div className="flex items-start gap-3 rounded-xl border border-gold/40 bg-gold/10 p-4">
+                  <Info className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+                  <div>
+                    <h2 className="font-serif text-xl font-medium text-ink">{t("site.booking.existingTitle")}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-ink/60">{t("site.booking.existingSubtitle")}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.existingName")}</span>
+                    <span className="font-serif text-base font-medium text-ink">{activeBooking.full_name}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.service2")}</span>
+                    <span className="font-serif text-base font-medium text-ink">{treatmentLabel(activeBooking.treatment)}</span>
+                  </div>
+                  {activeBooking.branch_name && (
+                    <div>
+                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.branchLabel")}</span>
+                      <span className="font-serif text-base font-medium text-ink">{activeBooking.branch_name}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.date")}</span>
+                    <span className="font-serif text-base font-medium text-ink">{formatDateLong(activeBooking.date, locale)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.queueNumber")}</span>
+                    <span className="font-serif text-base font-medium text-gold">#{activeBooking.queue_number}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.estimatedArrival")}</span>
+                    <span className="font-serif text-base font-medium text-ink">
+                      {formatTimeRange(activeBooking.estimated_arrival_start, activeBooking.estimated_arrival_end, t("site.booking.toBeConfirmed"))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.payment")}</span>
+                    <span className="font-serif text-base font-medium text-ink">
+                      {activeBooking.payment_method === "online" ? t("site.booking.paidOnline") : t("site.booking.payAtClinic")}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.paymentStatus")}</span>
+                    <span
+                      className={`inline-block mt-0.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        activeBooking.payment_status === "paid" ? "bg-emerald-500/15 text-emerald-800" : "bg-amber-500/15 text-amber-800"
+                      }`}
+                    >
+                      {activeBooking.payment_status === "paid" ? t("site.booking.paid") : t("site.booking.pending")}
+                    </span>
+                  </div>
+                </div>
+
+                {existingError && (
+                  <div className="rounded-xl border border-[#a83b2d]/20 bg-[#a83b2d]/10 p-3.5 text-xs text-[#a83b2d]">{existingError}</div>
+                )}
+
+                {existingMode === "actions" && (
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={handleKeepBooking}
+                      className="group inline-flex items-center justify-center gap-2 rounded-full bg-ink px-8 py-4 text-xs font-medium uppercase tracking-[0.2em] text-cream transition-all duration-300 hover:bg-ink/85"
+                    >
+                      <Check className="h-4 w-4" /> {t("site.booking.keepBooking")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExistingMode("changeDate")}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-ink/15 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:border-ink/30 hover:text-ink"
+                    >
+                      <CalendarIcon className="h-4 w-4" /> {t("site.booking.changeDate")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExistingMode("confirmCancel")}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-[#a83b2d]/30 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-[#a83b2d] transition-colors hover:bg-[#a83b2d]/10"
+                    >
+                      {t("site.booking.cancelBooking")}
+                    </button>
+                  </div>
+                )}
+
+                {existingMode === "changeDate" && (
+                  <div className="space-y-4 rounded-xl border border-ink/10 bg-white/60 p-5">
+                    <div>
+                      <label htmlFor="reschedule-date" className={labelBase}>
+                        {t("site.booking.pickNewDate")} <span className="text-gold">*</span>
+                      </label>
+                      <input
+                        id="reschedule-date"
+                        type="date"
+                        min={todayIso()}
+                        max={maxDate}
+                        value={newDate}
+                        onChange={(e) => handleNewDateChange(e.target.value)}
+                        className={`${inputBase} border-ink/15 ${newDate ? "text-ink" : "text-ink/45"}`}
+                      />
+                      {newDateError && <p role="alert" className="mt-2 text-xs text-[#a83b2d]">{newDateError}</p>}
+                    </div>
+                    {checkingNewDate && (
+                      <div className="flex items-center gap-2 text-sm text-ink/50">
+                        <Loader2 className="h-4 w-4 animate-spin" /> {t("site.booking.checkingAvailability")}
+                      </div>
+                    )}
+                    {newDateAvail && !newDateError && (
+                      <div className="rounded-xl border border-ink/10 bg-cream/60 p-4">
+                        <p className="font-serif text-base font-medium text-ink">{formatDateLong(newDate, locale)}</p>
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/60">
+                          <Users className="h-3.5 w-3.5" /> {t("site.booking.yourQueueWillBe")}{" "}
+                          <span className="font-medium text-gold">#{newDateAvail.next_queue_number}</span>
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExistingMode("actions");
+                          setNewDate("");
+                          setNewDateAvail(null);
+                          setNewDateError("");
+                        }}
+                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                      >
+                        <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReschedule}
+                        disabled={
+                          !newDateAvail || !!newDateError || checkingNewDate || existingBusy || newDateAvail.next_queue_number === null
+                        }
+                        className="group inline-flex items-center justify-center gap-2 rounded-full bg-ink px-8 py-4 text-xs font-medium uppercase tracking-[0.2em] text-cream transition-all duration-300 hover:bg-ink/85 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {existingBusy ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> {t("site.booking.savingNewDate")}
+                          </>
+                        ) : (
+                          <>
+                            {t("site.booking.confirmNewDate")}
+                            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {existingMode === "confirmCancel" && (
+                  <div className="space-y-4 rounded-xl border border-[#a83b2d]/30 bg-[#a83b2d]/10 p-5">
+                    <p className="flex items-start gap-2 text-sm leading-relaxed text-[#a83b2d]">
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {t("site.booking.cancelConfirmText")}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setExistingMode("actions")}
+                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                      >
+                        {t("site.booking.keepInstead")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelBooking}
+                        disabled={existingBusy}
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-[#a83b2d] px-8 py-4 text-xs font-medium uppercase tracking-[0.2em] text-white transition-all duration-300 hover:bg-[#a83b2d]/85 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {existingBusy ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> {t("site.booking.cancelling")}
+                          </>
+                        ) : (
+                          t("site.booking.confirmCancel")
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* ── STEP 3: PAYMENT METHOD ──────────────────────────────────────── */}

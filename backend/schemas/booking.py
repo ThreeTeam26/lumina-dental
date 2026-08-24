@@ -191,11 +191,32 @@ class BookingPublicResponse(BaseModel):
     estimated_arrival_end: Optional[datetime] = None
 
     consultation_fee: Optional[float] = None
+    branch_id: Optional[int] = None
     branch_name: Optional[str] = None
     payment_method: PaymentMethodEnum
     payment_status: PaymentStatusEnum
 
     model_config = {"from_attributes": True}
+
+
+class ActiveBookingResponse(BaseModel):
+    """Public lookup result for a phone's current active booking — so the
+    frontend can show the existing booking (and let the patient manage it)
+    instead of surfacing the one-active-per-phone rule as a raw error."""
+    has_active_booking: bool
+    booking: Optional[BookingPublicResponse] = None
+
+
+class BookingRescheduleRequest(BaseModel):
+    """Public: change an existing booking's date. `phone` is the ownership
+    check (patients have no account), matching the confirm-payment posture."""
+    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    phone: str = Field(..., min_length=6, max_length=30)
+
+
+class BookingCancelRequest(BaseModel):
+    """Public: cancel an existing booking. `phone` is the ownership check."""
+    phone: str = Field(..., min_length=6, max_length=30)
 
 
 class QueueStatusResponse(BaseModel):

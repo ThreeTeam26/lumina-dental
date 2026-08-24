@@ -177,6 +177,39 @@ def create_booking_with_queue_number(db: Session, estimate_fn, **kwargs) -> Book
     raise RuntimeError("Could not assign a unique queue number after several attempts") from last_error
 
 
+def reschedule_booking_with_queue_number(db: Session, booking: Booking, estimate_fn, new_date: str) -> Booking:
+    """Move an existing booking to `new_date` in place — assigning a fresh
+    queue number for that date at the booking's own branch and recomputing the
+    arrival estimate — WITHOUT ever creating a second row. Same
+    retry-on-conflict loop as create_booking_with_queue_number so two patients
+    landing on the same new date can't both claim the same number.
+
+    The next number is read before `booking` is mutated (it's still on its old
+    date in the DB), so it never counts this booking against the new date.
+    """
+    branch_id = booking.branch_id
+    last_error: Exception | None = None
+
+    for _ in range(MAX_QUEUE_ASSIGN_ATTEMPTS):
+        patients_ahead = count_active_bookings_for_date(db, new_date, branch_id)
+        next_number = get_max_queue_number_for_date(db, new_date, branch_id) + 1
+        estimated_start, estimated_end = estimate_fn(patients_ahead)
+        booking.date = new_date
+        booking.queue_number = next_number
+        booking.estimated_arrival_start = estimated_start
+        booking.estimated_arrival_end = estimated_end
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()  # reverts booking's date/queue back to the stored values
+            last_error = exc
+            continue
+        db.refresh(booking)
+        return booking
+
+    raise RuntimeError("Could not assign a unique queue number after several attempts") from last_error
+
+
 def get_booking(db: Session, booking_id: int) -> Booking | None:
     return db.query(Booking).filter(Booking.id == booking_id).first()
 

@@ -25,6 +25,9 @@ from schemas.booking import (
     BookingStatusUpdate,
     BookingResponse,
     BookingPublicResponse,
+    ActiveBookingResponse,
+    BookingRescheduleRequest,
+    BookingCancelRequest,
     QueueStatusResponse,
     ArrivalUpdate,
     ConsultationHintUpdate,
@@ -35,6 +38,9 @@ from schemas.booking import (
 from services.booking_service import (
     validate_and_create_booking,
     booking_to_public_response,
+    get_active_booking_for_phone,
+    reschedule_booking,
+    cancel_booking_public,
     get_queue_status,
     confirm_online_payment,
     record_payment,
@@ -63,6 +69,36 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 )
 def create_booking(data: BookingCreate, db: Session = Depends(get_db)):
     booking = validate_and_create_booking(db, data)
+    return booking_to_public_response(db, booking)
+
+
+# NOTE: registered before "/{booking_id}" so "active" isn't parsed as an id.
+@router.get(
+    "/active",
+    response_model=ActiveBookingResponse,
+    summary="The active booking for a phone number, if any (public)",
+)
+def active_booking(phone: str = Query(..., min_length=6, max_length=30), db: Session = Depends(get_db)):
+    return get_active_booking_for_phone(db, phone)
+
+
+@router.patch(
+    "/{booking_id}/reschedule",
+    response_model=BookingPublicResponse,
+    summary="Change the date of your existing booking (public)",
+)
+def reschedule_my_booking(booking_id: int, body: BookingRescheduleRequest, db: Session = Depends(get_db)):
+    booking = reschedule_booking(db, booking_id, body.date, body.phone)
+    return booking_to_public_response(db, booking)
+
+
+@router.patch(
+    "/{booking_id}/cancel",
+    response_model=BookingPublicResponse,
+    summary="Cancel your existing booking (public)",
+)
+def cancel_my_booking(booking_id: int, body: BookingCancelRequest, db: Session = Depends(get_db)):
+    booking = cancel_booking_public(db, booking_id, body.phone)
     return booking_to_public_response(db, booking)
 
 
