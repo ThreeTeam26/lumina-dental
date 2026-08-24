@@ -25,9 +25,19 @@ import logging
 from core.config import settings
 
 # ── Engine ────────────────────────────────────────────────────────────────────
+# `check_same_thread=False` is a SQLite-only connect arg (it tells the SQLite
+# driver a connection may be used from a different thread than it was
+# created on — FastAPI's threaded request handling needs that). Passing it to
+# psycopg would raise, so it's only included when the URL is actually SQLite.
+IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False},  # required for SQLite
+    connect_args={"check_same_thread": False} if IS_SQLITE else {},
+    # Cloud Postgres poolers (e.g. Supabase's pgbouncer) can silently drop
+    # idle connections; pre-ping verifies a pooled connection before use
+    # instead of surfacing that as a request failure. Harmless for SQLite.
+    pool_pre_ping=True,
     echo=False,
 )
 
@@ -329,7 +339,16 @@ def init_db() -> None:
     """Create all tables if they don't exist yet, and add any new columns
     to tables that already exist (lightweight migration — this project has
     no Alembic set up, so this keeps existing rows intact instead of
-    requiring a dropped/recreated database.db)."""
+    requiring a dropped/recreated database.db).
+
+    `Base.metadata.create_all` already gives a *fresh* database (SQLite or
+    Postgres) the complete, current schema in one shot — every migration
+    function below only has work to do against an existing SQLite
+    database.db that predates the schema change it backfills. On Postgres
+    (which this project only ever starts empty — see README) they run and
+    no-op safely, except `_migrate_booking_queue_constraint`, which speaks
+    SQLite's on-disk catalog directly and short-circuits on any other
+    dialect."""
     Base.metadata.create_all(bind=engine)
     _migrate_missing_columns()
     _migrate_booking_queue_constraint()
@@ -372,7 +391,11 @@ def _migrate_missing_columns() -> None:
                 col_type = column.type.compile(dialect=engine.dialect)
                 default_clause = ""
                 if column.name in ("patient_arrived", "consultation_hint_dismissed", "extra_charge_paid", "follow_up_needed", "consultation_registered"):
-                    default_clause = " DEFAULT 0"
+                    # TRUE/FALSE keywords, not 0/1 — SQLite (3.23+) accepts
+                    # them as aliases for 1/0, and Postgres's boolean columns
+                    # only accept boolean literals, not integers, in a
+                    # DEFAULT clause.
+                    default_clause = " DEFAULT FALSE"
                 elif column.name == "service_type":
                     # SAEnum stores the member NAME (e.g. existing rows hold
                     # 'PENDING'/'CLINIC'), so the backfill default must be the
@@ -397,7 +420,14 @@ def _migrate_booking_queue_constraint() -> None:
     collide. SQLite can't ALTER a table to change a composite UNIQUE
     constraint in place, so this renames the old table aside, lets
     create_all's fresh CREATE TABLE (with the new constraint) take its place,
-    copies every row over, then drops the old one."""
+    copies every row over, then drops the old one.
+
+    SQLite-only: it reads `sqlite_master` directly, which doesn't exist on
+    Postgres. Not needed there anyway — a Postgres database only ever starts
+    fresh via create_all, which already creates `bookings` with the current
+    (date, branch_id, queue_number) constraint from the start."""
+    if engine.dialect.name != "sqlite":
+        return
     inspector = inspect(engine)
     if "bookings" not in inspector.get_table_names():
         return
@@ -430,7 +460,12 @@ def _migrate_booking_queue_null_safety() -> None:
     just a bare column, and -1 always equals -1. Safe to (re-)run on every
     startup. If rows created before this fix already collide, index
     creation fails; that's logged instead of crashing startup so the app
-    stays usable while it's investigated."""
+    stays usable while it's investigated.
+
+    Cross-dialect as written: `CREATE UNIQUE INDEX IF NOT EXISTS ... ON
+    table (expr)` is the same syntax SQLite and Postgres both support, so
+    this is the DB-level enforcement layer on Postgres too — no dialect
+    branch needed here."""
     inspector = inspect(engine)
     if "bookings" not in inspector.get_table_names():
         return
@@ -458,7 +493,13 @@ def _migrate_legacy_medical_record_fields() -> None:
     into a single entry (dated to when the record was created) the first
     time this runs. The two checks below are independent — each only does
     work (and only drops its own stale column) the first time it finds one,
-    so this stays safe to call on every startup."""
+    so this stays safe to call on every startup.
+
+    No dialect branch needed: both checks key off whether the *current*
+    model still has the legacy columns (`inspector.get_columns(...)` against
+    what's actually on the table), which is never true on a Postgres
+    database created fresh via create_all — the legacy columns simply don't
+    exist there, so this no-ops correctly without SQLite-specific code."""
     inspector = inspect(engine)
 
     if "medical_records" in inspector.get_table_names():

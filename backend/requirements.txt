@@ -8,3 +8,6 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.20
 python-dotenv==1.0.1
 httpx==0.28.1
+# PostgreSQL driver — used only when DATABASE_URL points at Postgres (e.g.
+# Supabase in production). SQLite (the local default) needs no driver.
+psycopg[binary]==3.2.3

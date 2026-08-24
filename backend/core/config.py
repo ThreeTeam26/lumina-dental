@@ -2,12 +2,32 @@
 Pydantic Settings – loads values from .env automatically.
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────
+    # Local dev: left at this default → SQLite, no setup required.
+    # Production (Railway): set DATABASE_URL to the Supabase Postgres
+    # connection string as an environment variable — never in source.
     DATABASE_URL: str = "sqlite:///./database.db"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _normalize_database_url(cls, v: str) -> str:
+        """Supabase/Railway commonly hand out `postgres://...` (the old
+        Heroku-style scheme) or a driverless `postgresql://...` URL.
+        SQLAlchemy 2.x rejects the former outright and defaults the latter to
+        psycopg2, which this project doesn't install — normalize both to
+        explicitly request the `psycopg` (v3) driver that's actually in
+        requirements.txt. SQLite URLs, and any URL that already names a
+        driver (e.g. `postgresql+psycopg://`), pass through unchanged."""
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://"):]
+        if v.startswith("postgresql://"):
+            v = "postgresql+psycopg://" + v[len("postgresql://"):]
+        return v
 
     # ── JWT / Auth ────────────────────────────────────────────────────────
     SECRET_KEY: str = "change-me-to-a-long-random-string-in-production"

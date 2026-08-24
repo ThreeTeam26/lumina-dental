@@ -55,7 +55,7 @@ There are no fixed appointment time slots. A patient picks a **day**; the backen
 | Styling | **Tailwind CSS 4** |
 | 3D / Animation | **Three.js** · **@react-three/fiber** · **GSAP** (ScrollTrigger) · **Lenis** (smooth scroll) |
 | Backend framework | **FastAPI** · **Python 3.12** |
-| Database | **SQLite** via **SQLAlchemy 2.0** (lightweight auto-migration on startup — no Alembic) |
+| Database | **SQLite** locally / **PostgreSQL** (Supabase) in production — both via **SQLAlchemy 2.0** + `psycopg`, selected entirely by `DATABASE_URL` (lightweight auto-migration on startup — no Alembic) |
 | Auth | **JWT** (`python-jose`) + **bcrypt** (`passlib`) |
 | Validation | **Pydantic v2** |
 | Notifications | **WhatsApp Cloud API** (optional, via `httpx`) |
@@ -88,10 +88,12 @@ API docs: **http://127.0.0.1:8000/docs**
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Defaults to local SQLite (`sqlite:///./database.db`) |
+| `DATABASE_URL` | Defaults to local SQLite (`sqlite:///./database.db`). In production this is set to a Supabase Postgres connection string — see "☁️ Deployment" below. Same code, no source change either way. |
 | `SECRET_KEY` | JWT signing key — **set a real random value before deploying** |
 | `CORS_ORIGINS` / `CORS_ORIGIN_REGEX` | Allowed frontend origins |
 | `WHATSAPP_API_URL` / `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Cloud API — reminders no-op until all three are set |
+
+Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` to get started — its defaults already match local SQLite, so it's optional unless you want to override something (e.g. WhatsApp credentials).
 
 ### 2) Frontend (Next.js)
 
@@ -103,7 +105,7 @@ npm run dev
 
 Open **http://localhost:3000** for the site, or **http://localhost:3000/admin** for the dashboard.
 
-By default the frontend talks to `http://127.0.0.1:8000`; override with `NEXT_PUBLIC_API_URL` in `frontend/.env.local` if the backend runs elsewhere. If the backend is unreachable, the admin dashboard falls back to a local `localStorage` demo store so the UI stays usable offline.
+By default the frontend talks to `http://127.0.0.1:8000`; override with `NEXT_PUBLIC_API_URL` in `frontend/.env.local` if the backend runs elsewhere (see [`frontend/.env.local.example`](frontend/.env.local.example)). If the backend is unreachable, the admin dashboard falls back to a local `localStorage` demo store so the UI stays usable offline.
 
 ---
 
@@ -136,34 +138,44 @@ work/
 
 ---
 
-## ☁️ Deployment (Vercel + Railway)
+## ☁️ Deployment (Vercel + Railway + Supabase)
 
-The frontend and backend deploy as two separate services against this same repo.
+The frontend and backend deploy as two separate services against this **same repo** — nothing is forked or duplicated. Locally the backend runs on SQLite; in production it runs on Supabase Postgres. Both are the same code — only `DATABASE_URL` changes, via environment variables. See [`core/config.py`](backend/core/config.py) and [`core/database.py`](backend/core/database.py) for how that's wired.
 
 ### 1) Push to GitHub first
 Both platforms deploy from a GitHub repo — make sure your latest commits are pushed to `origin/main` before starting either import below.
 
-### 2) Backend → Railway
+### 2) Create the production database → Supabase
+1. On [supabase.com](https://supabase.com), create a new project (or reuse one).
+2. **Settings → Database → Connection string**, pick the **Transaction pooler** (port `5432` or `6543` depending on plan) — the pooled connection is the one meant for a stateless web backend like this one. Copy it; it looks like:
+   ```
+   postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-0-<REGION>.pooler.supabase.com:5432/postgres
+   ```
+3. **Do not** put this string in any file in the repo, the README, or a commit. It only ever goes into Railway's environment variables (next step). The database itself starts empty — the backend creates every table automatically on first startup (`Base.metadata.create_all`, see `core/database.py`); there's nothing to run manually in Supabase's SQL editor.
+
+### 3) Backend → Railway
 1. On [railway.app](https://railway.app), **New Project → Deploy from GitHub repo** → pick this repo.
 2. In the service settings, set **Root Directory** to `backend`. Railway auto-detects Python via `requirements.txt` and uses `backend/Procfile` for the start command — no build config needed.
 3. Add these environment variables on the service:
    | Variable | Value |
    | --- | --- |
+   | `DATABASE_URL` | the Supabase connection string from step 2 (**required** — omitting this falls back to local SQLite, which is not durable on Railway's filesystem) |
    | `SECRET_KEY` | a long random string (**required** — don't ship the default) |
    | `CORS_ORIGINS` | your Vercel URL once you have it, e.g. `https://your-app.vercel.app` |
-4. **Persist the database** — SQLite writes to a local file, which is wiped on every redeploy unless you attach storage. In the service → **Volumes**, add a volume mounted at `/app` (the working directory `database.db` is created in). Without this, the database resets on every deploy.
-5. Deploy, then copy the generated public URL (Settings → Networking → Generate Domain) — you'll need it for step 3 below.
+   | `WHATSAPP_API_URL` / `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | only if WhatsApp reminders are wired up for this deployment |
+4. Deploy, then copy the generated public URL (Settings → Networking → Generate Domain) — you'll need it for the next step. Check the deploy logs for `🦷 Lumina Dental API starting up …` with no traceback — that confirms `init_db()` connected to Supabase and created the schema successfully.
 
-### 3) Frontend → Vercel
+### 4) Frontend → Vercel
 1. On [vercel.com](https://vercel.com), **Add New → Project** → import the same GitHub repo.
 2. Set **Root Directory** to `frontend` in the import screen (or Project Settings → General afterward).
-3. Add an environment variable: `NEXT_PUBLIC_API_URL` = the Railway backend URL from step 2.5 above (no trailing slash).
+3. Add an environment variable: `NEXT_PUBLIC_API_URL` = the Railway backend URL from step 3.4 above (no trailing slash).
 4. Deploy. Once it's live, go back to Railway and update `CORS_ORIGINS` to the real `https://your-app.vercel.app` domain Vercel just gave you, so the browser is actually allowed to call the API.
 
 ### Notes
 - Redeploy the frontend after changing `NEXT_PUBLIC_API_URL` (Next.js inlines `NEXT_PUBLIC_*` vars at build time).
 - The admin dashboard falls back to `http://127.0.0.1:8000` if `NEXT_PUBLIC_API_URL` isn't set — you'll see "Demo Mode"-style broken requests if it's missing in production.
-- For a clinic handling real patient data, consider swapping SQLite for Railway's Postgres plugin (`DATABASE_URL` already reads from the environment) instead of relying on a volume.
+- Supabase's dev/dev-branch data is a **separate database** from your local `backend/database.db` — local SQLite data is never automatically copied there. Seed accounts (`admin`/`staff`) are created fresh on Supabase the same way they are locally, by `_seed_default_users()` on first startup.
+- **Uploaded medical images are not yet durable in production.** `backend/uploads/` is local disk — Railway's filesystem is ephemeral (wiped on every redeploy) unless a volume is attached, and even a volume doesn't survive moving to a different host. The database only stores the image's *filename/metadata* (`MedicalImage.filename`), not the file itself — that's already separated from the actual bytes on disk, which is what makes swapping the storage backend later a contained change. For real patient data in production, plan to move `services`/upload handling in `routers/medical_records.py` to write to Supabase Storage or S3 instead of the local `uploads/` directory before relying on this feature in production; this is not implemented in this change.
 
 ---
 
@@ -192,7 +204,7 @@ Full interactive docs at `/docs`. Highlights:
 
 ## 📝 Notes
 
-- **SQLite + auto-migration** — there's no Alembic; `core/database.py` adds any missing columns to an existing `database.db` on startup, so upgrading the schema never requires dropping data. Fine for a single-clinic deployment; swap to Postgres via `DATABASE_URL` for anything larger.
+- **SQLite locally, Postgres in production, one codebase** — there's no Alembic; `core/database.py` adds any missing columns to an existing SQLite `database.db` on startup, so upgrading the schema never requires dropping data. `DATABASE_URL` selects the dialect entirely — SQLite-only migration steps (e.g. the legacy queue-constraint upgrade) detect and skip themselves on Postgres, since a Postgres database only ever starts fresh with the complete current schema via `Base.metadata.create_all`.
 - **No real payment gateway** — online payment is simulated; wiring a real provider (Stripe, Paymob, …) means replacing `confirm_online_payment` in `services/booking_service.py` with a signed webhook/callback.
 - **One active booking per phone** — patients have no accounts; the phone number is the identity key, tolerant of formatting differences (leading zero / country code).
 - **Placeholder content** — treatment imagery, the doctor profile, and testimonials on the public site are demo content built to be swapped 1:1 for real photography and copy.
