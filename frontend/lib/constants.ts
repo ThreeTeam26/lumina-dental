@@ -280,12 +280,11 @@ export const TREATMENT_OPTIONS = [
 export const CONSULTATION_SERVICE = "Consultation";
 
 /**
- * Full service picker for the booking form: a consultation request plus the
- * clinic's existing treatments. Choosing "Consultation" flags the booking as
- * a consultation; everything else is a normal treatment appointment.
+ * Service picker for the public booking form — the clinic's treatments only.
+ * Consultations are no longer patient-bookable (staff register them from the
+ * admin); CONSULTATION_SERVICE is kept for comparisons/labels elsewhere.
  */
 export const SERVICE_OPTIONS = [
-  CONSULTATION_SERVICE,
   ...TREATMENT_OPTIONS,
 ] as const;
 

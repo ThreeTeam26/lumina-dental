@@ -11,7 +11,6 @@ import {
   Users,
   Info,
   ShieldCheck,
-  Building2,
   Loader2,
   TriangleAlert,
 } from "lucide-react";
@@ -45,7 +44,6 @@ type Step = "branch" | "date" | "details" | "existing" | "payment" | "online" | 
 type Fields = {
   fullName: string;
   phone: string;
-  email: string;
   treatment: string;
   branchId: string;
   message: string;
@@ -54,7 +52,6 @@ type Fields = {
 const EMPTY_FIELDS: Fields = {
   fullName: "",
   phone: "",
-  email: "",
   treatment: "",
   branchId: "",
   message: "",
@@ -72,6 +69,38 @@ const TREATMENT_LABEL_KEYS: Record<string, string> = {
   "General Dentistry": "treatmentGeneral",
   "Pediatric Dentistry": "treatmentPediatric",
 };
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: "statusPending",
+  confirmed: "statusConfirmed",
+  cancelled: "statusCancelled",
+  completed: "statusCompleted",
+};
+
+// Online payment is a future feature: the card still shows in the UI so
+// patients know it's coming, but it's disabled ("coming soon") and can't be
+// selected — everyone pays at the clinic for now. Flip this to true to enable
+// the online-payment option and the simulated checkout step.
+const ONLINE_PAYMENT_ENABLED = false;
+const DEFAULT_PAYMENT_METHOD: PaymentMethod | null = ONLINE_PAYMENT_ENABLED ? null : "clinic";
+
+// Egyptian mobile numbers are 11 digits: 01 + operator digit (0/1/2/5) + 8 more.
+const EGYPT_MOBILE_RE = /^01[0125][0-9]{8}$/;
+
+// Strip formatting and, when the number was written with a country code
+// (+20 / 0020) or without its leading 0, fold it back to the local 11-digit
+// form (01552007412) so validation and storage stay consistent.
+function normalizeEgyptPhone(raw: string): string {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("0020")) d = d.slice(4);
+  else if (d.length === 12 && d.startsWith("20")) d = d.slice(2);
+  if (d.length === 10 && d.startsWith("1")) d = "0" + d;
+  return d;
+}
+
+function isValidEgyptPhone(raw: string): boolean {
+  return EGYPT_MOBILE_RE.test(normalizeEgyptPhone(raw));
+}
 
 const inputBase =
   "w-full rounded-xl border bg-white/60 px-4 py-3 text-ink outline-none transition-colors duration-200 placeholder:text-ink/35 focus:border-gold focus:ring-2 focus:ring-gold/25";
@@ -167,6 +196,10 @@ export default function BookingPage() {
     const key = TREATMENT_LABEL_KEYS[opt];
     return key ? t(`site.booking.${key}`) : opt;
   };
+  const statusLabel = (status: string) => {
+    const key = STATUS_LABEL_KEYS[status?.toLowerCase()];
+    return key ? t(`site.booking.${key}`) : status;
+  };
   const STEPS: { id: Step; label: string }[] = [
     { id: "branch", label: t("site.booking.stepBranch") },
     { id: "date", label: t("site.booking.stepDate") },
@@ -187,7 +220,7 @@ export default function BookingPage() {
   const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(DEFAULT_PAYMENT_METHOD);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -286,8 +319,7 @@ export default function BookingPage() {
   // never wrongly assume "no booking" on a transient error.
   useEffect(() => {
     if (step !== "details") return;
-    const digits = fields.phone.replace(/\D/g, "");
-    if (digits.length < 7) return;
+    if (!isValidEgyptPhone(fields.phone)) return;
     const handle = setTimeout(async () => {
       const requestId = ++activeCheckId.current;
       try {
@@ -375,10 +407,7 @@ export default function BookingPage() {
     const e: Partial<Record<keyof Fields, string>> = {};
     if (!f.fullName.trim()) e.fullName = t("site.booking.nameRequired");
     if (!f.phone.trim()) e.phone = t("site.booking.phoneRequired");
-    else if (!/[0-9]{6,}/.test(f.phone.replace(/[^0-9]/g, "")))
-      e.phone = t("site.booking.phoneInvalid");
-    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
-      e.email = t("site.booking.emailInvalid");
+    else if (!isValidEgyptPhone(f.phone)) e.phone = t("site.booking.phoneInvalid");
     if (!f.treatment) e.treatment = t("site.booking.serviceRequired");
     return e;
   };
@@ -398,7 +427,6 @@ export default function BookingPage() {
       const result = await submitBooking({
         full_name: fields.fullName,
         phone: fields.phone,
-        email: fields.email || undefined,
         treatment: fields.treatment,
         service_type: fields.treatment === CONSULTATION_SERVICE ? "consultation" : "treatment",
         date,
@@ -451,7 +479,7 @@ export default function BookingPage() {
     setAvailability(null);
     setFields(EMPTY_FIELDS);
     setErrors({});
-    setPaymentMethod(null);
+    setPaymentMethod(DEFAULT_PAYMENT_METHOD);
     setConfirmation(null);
     setLiveQueue(null);
     setSubmitError("");
@@ -790,30 +818,21 @@ export default function BookingPage() {
                     <input
                       id="phone"
                       type="tel"
+                      inputMode="numeric"
                       autoComplete="tel"
                       value={fields.phone}
                       onChange={set("phone")}
+                      onBlur={() =>
+                        setFields((f) => {
+                          const norm = normalizeEgyptPhone(f.phone);
+                          return EGYPT_MOBILE_RE.test(norm) && norm !== f.phone ? { ...f, phone: norm } : f;
+                        })
+                      }
                       className={`${inputBase} ${border("phone")}`}
-                      placeholder="+20 100 000 0000"
+                      placeholder="01XXXXXXXXX"
                     />
                     {err("phone")}
                   </div>
-                </div>
-
-                <div>
-                  <label htmlFor="email" className={labelBase}>
-                    {t("site.booking.email")}
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={fields.email}
-                    onChange={set("email")}
-                    className={`${inputBase} ${border("email")}`}
-                    placeholder={t("site.booking.emailPlaceholder")}
-                  />
-                  {err("email")}
                 </div>
 
                 <div>
@@ -1126,16 +1145,22 @@ export default function BookingPage() {
                   <div className="mt-2 grid gap-4 sm:grid-cols-2">
                     {(
                       [
-                        { id: "clinic" as const, title: t("site.booking.payAtClinicTitle"), desc: t("site.booking.payAtClinicDesc") },
-                        { id: "online" as const, title: t("site.booking.payOnlineTitle"), desc: t("site.booking.payOnlineDesc") },
+                        { id: "clinic" as const, title: t("site.booking.payAtClinicTitle"), desc: t("site.booking.payAtClinicDesc"), disabled: false },
+                        { id: "online" as const, title: t("site.booking.payOnlineTitle"), desc: t("site.booking.payOnlineDesc"), disabled: !ONLINE_PAYMENT_ENABLED },
                       ]
-                    ).map((opt) => (
+                    ).map((opt) => {
+                      const selected = paymentMethod === opt.id;
+                      return (
                       <button
                         key={opt.id}
                         type="button"
-                        onClick={() => setPaymentMethod(opt.id)}
+                        disabled={opt.disabled}
+                        aria-disabled={opt.disabled}
+                        onClick={() => { if (!opt.disabled) setPaymentMethod(opt.id); }}
                         className={`rounded-xl border p-5 text-left transition-all ${
-                          paymentMethod === opt.id
+                          opt.disabled
+                            ? "cursor-not-allowed border-ink/10 bg-ink/[0.03] opacity-60"
+                            : selected
                             ? "border-gold bg-gold/10 ring-2 ring-gold/25"
                             : "border-ink/15 bg-white/50 hover:border-ink/30"
                         }`}
@@ -1143,16 +1168,22 @@ export default function BookingPage() {
                         <span className="flex items-center gap-2">
                           <span
                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                              paymentMethod === opt.id ? "border-gold" : "border-ink/30"
+                              selected ? "border-gold" : "border-ink/30"
                             }`}
                           >
-                            {paymentMethod === opt.id && <span className="h-2 w-2 rounded-full bg-gold" />}
+                            {selected && <span className="h-2 w-2 rounded-full bg-gold" />}
                           </span>
                           <span className="font-serif text-base font-medium text-ink">{opt.title}</span>
+                          {opt.disabled && (
+                            <span className="ms-auto rounded-full bg-ink/10 px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-ink/50">
+                              {t("site.booking.comingSoon")}
+                            </span>
+                          )}
                         </span>
                         <span className="mt-2 block text-xs leading-relaxed text-ink/55">{opt.desc}</span>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1321,7 +1352,7 @@ export default function BookingPage() {
                   </div>
                   <div>
                     <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.status")}</span>
-                    <span className="font-serif text-base font-medium capitalize text-ink">{confirmation.status}</span>
+                    <span className="font-serif text-base font-medium capitalize text-ink">{statusLabel(confirmation.status)}</span>
                   </div>
                 </div>
 
@@ -1329,11 +1360,6 @@ export default function BookingPage() {
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
                   {t("site.booking.arrivalDisclaimer")}
                 </p>
-
-                <div className="mt-4 flex items-center gap-2 text-xs text-ink/40">
-                  <Building2 className="h-3.5 w-3.5" />
-                  <span>{t("site.booking.bookingReference", { id: confirmation.id })}</span>
-                </div>
 
                 <div className="mt-8 flex flex-wrap items-center gap-4">
                   <button

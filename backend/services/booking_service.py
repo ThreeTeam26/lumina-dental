@@ -7,12 +7,14 @@ are computed/validated here on the backend — the frontend only ever
 displays what these functions return.
 """
 
+import re
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from core.crud.booking import (
     create_booking_with_queue_number,
+    create_list_only_consultation,
     reschedule_booking_with_queue_number,
     find_active_booking_for_phone,
     _phones_match,
@@ -481,39 +483,21 @@ def register_consultation(db: Session, booking_id: int, current_user: User) -> B
         )
 
     branch = booking.branch
-    schedule = branch_working_hours(branch)
-
-    # Land the consultation on the next day the clinic (or this branch) is
-    # actually open, starting today.
-    consultation_date = date.today()
-    for _ in range(8):
-        if is_working_day(consultation_date, schedule):
-            break
-        consultation_date += timedelta(days=1)
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Could not find an open day to schedule the consultation.",
-        )
-
-    now = datetime.now()
-
-    def estimate_fn(patients_ahead: int):
-        return _estimate_window(consultation_date, patients_ahead, now, schedule)
 
     fee = get_consultation_fee(db)
     if branch is not None and branch.consultation_price is not None:
         fee = branch.consultation_price
 
-    consultation_booking = create_booking_with_queue_number(
+    # A registered consultation goes straight to the Consultations list — it is
+    # NOT placed in any day's queue. It gets no date and no queue number until
+    # staff optionally assign a date from that list (see set_consultation_date).
+    consultation_booking = create_list_only_consultation(
         db,
-        estimate_fn,
         full_name=booking.full_name,
         phone=booking.phone,
         email=booking.email,
         treatment=CONSULTATION_LABEL,
         service_type=ServiceType.CONSULTATION,
-        date=consultation_date.isoformat(),
         time=None,
         message=None,
         consultation_fee=fee,
@@ -524,6 +508,31 @@ def register_consultation(db: Session, booking_id: int, current_user: User) -> B
 
     booking.consultation_registered = True
     booking.consultation_booking_id = consultation_booking.id
+    return _stamp_audit(db, booking, current_user)
+
+
+def set_consultation_date(db: Session, booking_id: int, new_date: str, current_user: User) -> Booking:
+    """Assign (or clear) the date on a list-only consultation from the
+    Consultations list. It's just a scheduling note — the consultation stays in
+    that list and never enters a day's queue, so no queue number is assigned.
+    Empty string clears the date back to 'unscheduled'."""
+    booking = crud_get(db, booking_id)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    # Only list-only consultations (no queue number) can be dated this way — a
+    # patient-booked, queued consultation is scheduled through the normal flow.
+    if booking.service_type != ServiceType.CONSULTATION or booking.queue_number is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A date can only be set on a list-only consultation.",
+        )
+    new_date = (new_date or "").strip()
+    if new_date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", new_date):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Date must be in YYYY-MM-DD format.",
+        )
+    booking.date = new_date
     return _stamp_audit(db, booking, current_user)
 
 
@@ -540,12 +549,9 @@ def mark_arrival(db: Session, booking_id: int, arrived: bool, current_user: User
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A patient can only be marked as entered on the day of their booking.",
             )
-        now = datetime.now()
-        if not is_within_working_hours(now, branch_working_hours(booking.branch)):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A patient can only be marked as entered during the clinic's working hours.",
-            )
+        # No working-hours gate: once it's the patient's booking day, staff can
+        # check them in whenever they actually walk in — early, late, or after
+        # the posted closing time.
         if booking.status == BookingStatus.CANCELLED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

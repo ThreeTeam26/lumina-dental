@@ -2,10 +2,28 @@
 Pydantic v2 schemas for the Booking resource.
 """
 
+import re
 from datetime import datetime
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Optional
 from enum import Enum
+
+
+# Egyptian mobile numbers are 11 digits: 01 + operator digit (0/1/2/5) + 8 more.
+_EGYPT_MOBILE_RE = re.compile(r"^01[0125]\d{8}$")
+
+
+def _normalize_egypt_phone(raw: str) -> str:
+    """Strip formatting and fold a country-code (+20 / 0020) or leading-zero-less
+    number back to the local 11-digit form (01552007412)."""
+    d = re.sub(r"\D", "", raw or "")
+    if d.startswith("0020"):
+        d = d[4:]
+    elif len(d) == 12 and d.startswith("20"):
+        d = d[2:]
+    if len(d) == 10 and d.startswith("1"):
+        d = "0" + d
+    return d
 
 
 class BookingStatusEnum(str, Enum):
@@ -47,8 +65,18 @@ class BookingCreate(BaseModel):
     backend and cannot be supplied by the client.
     """
     full_name: str = Field(..., min_length=2, max_length=120, examples=["Ahmed Hassan"])
-    phone: str = Field(..., min_length=6, max_length=30, examples=["+201001234567"])
+    phone: str = Field(..., min_length=6, max_length=30, examples=["01552007412"])
     email: Optional[EmailStr] = Field(None, examples=["ahmed@example.com"])
+
+    @field_validator("phone")
+    @classmethod
+    def _validate_egypt_phone(cls, v: str) -> str:
+        """Require a valid 11-digit Egyptian mobile number, storing it in the
+        normalized local form so admin views and matching stay consistent."""
+        norm = _normalize_egypt_phone(v)
+        if not _EGYPT_MOBILE_RE.match(norm):
+            raise ValueError("Enter a valid 11-digit Egyptian mobile number (e.g. 01552007412).")
+        return norm
     treatment: str = Field(..., min_length=2, max_length=80, examples=["Cosmetic Dentistry"])
     # Consultation vs. treatment appointment. Optional & defaults to treatment
     # so existing clients that don't send it keep working unchanged.
@@ -76,6 +104,13 @@ class ConsultationHintUpdate(BaseModel):
     """Staff show/hide the 'patient also has a consultation' reminder on a
     completed exam. UI-only flag — never affects the consultation booking."""
     dismissed: bool
+
+
+class ConsultationDateUpdate(BaseModel):
+    """Staff set (or clear) the date on a list-only consultation from the
+    Consultations list. Empty string clears it back to 'unscheduled'; it never
+    schedules the consultation into a day's queue."""
+    date: str = Field("", max_length=20, examples=["2026-09-01", ""])
 
 
 class ConsultationFeeUpdate(BaseModel):

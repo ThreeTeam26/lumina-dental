@@ -110,6 +110,10 @@ def get_financial_summary(db: Session, start: str, end: str) -> dict:
 
     # ── All-time / fixed-period KPIs ──────────────────────────────────────────
     total_revenue = 0.0
+    # Revenue split into its two sources: the base exam/consultation fee vs.
+    # extra charges for add-on procedures (implants, etc.).
+    fee_revenue = 0.0
+    extra_revenue = 0.0
     today_revenue = week_revenue = month_revenue = 0.0
     pending_payments = 0.0
     cancelled_all = 0
@@ -118,8 +122,12 @@ def get_financial_summary(db: Session, start: str, end: str) -> dict:
     revenue_phones: set[str] = set()  # patients who generated revenue (ARPU base)
 
     for b in bookings:
-        rev = _revenue_of(b, default_fee)
+        fee_rev = _fee_collected(b, default_fee)
+        extra_rev = _extra_collected(b)
+        rev = fee_rev + extra_rev
         total_revenue += rev
+        fee_revenue += fee_rev
+        extra_revenue += extra_rev
         pending_payments += _pending_of(b, default_fee)
         if b.status == BookingStatus.CANCELLED:
             cancelled_all += 1
@@ -148,6 +156,8 @@ def get_financial_summary(db: Session, start: str, end: str) -> dict:
         "week_revenue": _round(week_revenue),
         "month_revenue": _round(month_revenue),
         "total_revenue": _round(total_revenue),
+        "fee_revenue": _round(fee_revenue),
+        "extra_revenue": _round(extra_revenue),
         "pending_payments": _round(pending_payments),
         "total_expenses": _round(total_expenses),
         "net_profit": _round(net_profit),

@@ -467,6 +467,21 @@ export async function registerConsultation(token: string, bookingId: number): Pr
 }
 
 /**
+ * Set (or clear, with "") the date on a list-only consultation from the
+ * Consultations list. It's just a scheduling note — the consultation stays in
+ * that list and never enters a day's queue.
+ */
+export async function setConsultationDate(token: string, bookingId: number, date: string): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/consultation-date`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ date }),
+  });
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res, "Could not set the consultation date."), res.status);
+  return res.json();
+}
+
+/**
  * Show/hide the "patient also has a consultation" reminder shown on a
  * completed exam. UI-only flag — it never changes the consultation booking.
  * Falls back to the local demo store when the backend is offline, mirroring
@@ -550,6 +565,8 @@ export interface FinanceSummary {
     week_revenue: number;
     month_revenue: number;
     total_revenue: number;
+    fee_revenue: number;
+    extra_revenue: number;
     pending_payments: number;
     total_expenses: number;
     net_profit: number;

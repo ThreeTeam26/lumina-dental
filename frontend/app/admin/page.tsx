@@ -50,6 +50,7 @@ import {
   updateArrivalStatus,
   recordPayment,
   registerConsultation,
+  setConsultationDate,
   updateConsultationHintDismissed,
   updateExtraCharge,
   deleteBooking,
@@ -67,6 +68,12 @@ import { ClinicSettings } from "@/components/admin/ClinicSettings";
 
 /** A booking is a consultation when the backend tagged its service type. */
 const isConsultation = (b: Booking) => b.service_type === "consultation";
+
+/** A "list-only" consultation lives ONLY in the Consultations list — it was
+ *  registered by staff and never placed in a day's queue, so it has no queue
+ *  number (patient-booked consultations always get one). Its date, if any, is
+ *  just a note and never puts it back in the daily schedule. */
+const isListOnlyConsultation = (b: Booking) => isConsultation(b) && b.queue_number == null;
 
 /** Month select options, English label with the Arabic name in parens. */
 const MONTH_NAMES = [
@@ -317,6 +324,7 @@ export default function AdminPage() {
   const [arrivalError, setArrivalError] = useState("");
   const [paymentUpdatingId, setPaymentUpdatingId] = useState<number | null>(null);
   const [consultationRegisteringId, setConsultationRegisteringId] = useState<number | null>(null);
+  const [consultationDateSavingId, setConsultationDateSavingId] = useState<number | null>(null);
 
   // Extra charge state (staff add a charge on top of the base appointment —
   // e.g. a crown/filling done during or after the exam).
@@ -612,10 +620,28 @@ export default function AdminPage() {
       // so it shows up in the Consultations tab (an optimistic patch to
       // this one booking wouldn't surface the new row).
       await loadBookings();
+      // Take staff straight to the Consultations list so they immediately see
+      // the consultation they just registered (it isn't in the day schedule).
+      setViewMode("consultations");
     } catch (err) {
       setArrivalError(err instanceof ApiError ? err.message : "Could not register the consultation.");
     } finally {
       setConsultationRegisteringId(null);
+    }
+  };
+
+  // Set (or clear, with "") the date on a list-only consultation from the
+  // Consultations tab. It stays in that list — the date is just a note and
+  // never puts the consultation back into a day's queue.
+  const handleSetConsultationDate = async (bookingId: number, date: string) => {
+    setConsultationDateSavingId(bookingId);
+    try {
+      const updated = await setConsultationDate(token || "", bookingId, date);
+      applyBookingUpdate(updated);
+    } catch {
+      loadBookings();
+    } finally {
+      setConsultationDateSavingId(null);
     }
   };
 
@@ -898,6 +924,9 @@ export default function AdminPage() {
 
     return bookings
       .filter((b) => {
+        // List-only consultations live in the Consultations tab only — never
+        // in a day's schedule.
+        if (isListOnlyConsultation(b)) return false;
         const isSelectedDay = b.date === selectedDate;
         if (!query) return isSelectedDay;
 
@@ -939,6 +968,10 @@ export default function AdminPage() {
     const prevYearMonth = toLocalIso(prevDate).substring(0, 7);
 
     return bookings.filter((b) => {
+      // List-only consultations belong to the Consultations tab, not the
+      // day/all-bookings schedule.
+      if (isListOnlyConsultation(b)) return false;
+
       // Status filter
       const matchesStatus =
         statusFilter === "all" ? true : b.status === statusFilter;
@@ -995,6 +1028,9 @@ export default function AdminPage() {
     return bookings
       .filter((b) => {
         if (!isConsultation(b)) return false;
+        // The Consultations list is a work-queue of requests still to handle —
+        // once a consultation is confirmed / cancelled / completed it drops off.
+        if (b.status !== "pending") return false;
         if (!query) return true;
 
         const phoneDigits = digitsOf(b.phone);
@@ -1740,7 +1776,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* Side Action Buttons */}
-                    <div className="flex flex-wrap lg:flex-col items-center lg:items-end gap-2 border-t lg:border-t-0 lg:border-l border-[#101820]/10 pt-4 lg:pt-0 lg:pl-6">
+                    <div className="flex flex-wrap lg:flex-col items-center lg:items-end gap-2.5 border-t lg:border-t-0 lg:border-l border-[#101820]/10 pt-4 lg:pt-0 lg:pl-6">
                       <div className="flex items-center gap-2 w-full justify-start lg:justify-end">
                         <a
                           href={`tel:${b.phone}`}
@@ -1792,7 +1828,7 @@ export default function AdminPage() {
                       </div>
 
                       {/* Status quick switcher buttons */}
-                      <div className="flex items-center gap-1.5 mt-1">
+                      <div className="flex items-center gap-1.5 w-full justify-start lg:justify-end pt-2.5 border-t border-[#101820]/10">
                         <span className="text-[0.65rem] text-[#101820]/50 uppercase tracking-wider mr-1">
                           {t("admin.common.status")}
                         </span>
@@ -1926,23 +1962,23 @@ export default function AdminPage() {
                         </div>
                       )}
                     </div>
-
-                    {(b.branch_name || b.updated_by) && (
-                      <div className="flex items-center gap-3 text-[0.65rem] text-[#101820]/45">
-                        {b.branch_name && (
-                          <span className="inline-flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {t("admin.record.branch")}: {b.branch_name}
-                          </span>
-                        )}
-                        {b.updated_by && (
-                          <span>
-                            {t("admin.record.updatedBy")}: {b.updated_by}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {(b.branch_name || b.updated_by) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-3 border-t border-[#101820]/5 text-[0.6rem] text-[#101820]/40">
+                      {b.branch_name && (
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 className="w-3 h-3" />
+                          {t("admin.record.branch")}: {b.branch_name}
+                        </span>
+                      )}
+                      {b.updated_by && (
+                        <span>
+                          {t("admin.record.updatedBy")}: {b.updated_by}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {renderExtraChargePanel(b)}
                   </div>
@@ -2439,11 +2475,14 @@ export default function AdminPage() {
                           ● {b.status.toUpperCase()}
                         </span>
 
-                        {/* Queue number */}
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#f4f1eb] text-[#101820] text-xs font-medium border border-[#101820]/10">
-                          <ListFilter className="w-3.5 h-3.5 text-[#b99a6b]" />
-                          {t("admin.agenda.queue", { number: b.queue_number ?? "—" })}
-                        </span>
+                        {/* Queue number — only patient-booked consultations
+                            are queued; list-only ones aren't in any schedule. */}
+                        {!isListOnlyConsultation(b) && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#f4f1eb] text-[#101820] text-xs font-medium border border-[#101820]/10">
+                            <ListFilter className="w-3.5 h-3.5 text-[#b99a6b]" />
+                            {t("admin.agenda.queue", { number: b.queue_number ?? "—" })}
+                          </span>
+                        )}
                       </div>
 
                       {/* Patient */}
@@ -2465,12 +2504,41 @@ export default function AdminPage() {
 
                       {/* Date / time / created */}
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-[#101820]/70">
-                        <span className="flex items-center gap-1.5">
-                          <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" /> {b.date}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Clock3 className="w-3.5 h-3.5 text-[#b99a6b]" /> {formatEstimatedTime(b)}
-                        </span>
+                        {isListOnlyConsultation(b) ? (
+                          // List-only: an OPTIONAL date the staff can set — it's
+                          // just a note, the consultation stays in this list.
+                          <span className="flex items-center gap-2">
+                            <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" />
+                            {!b.date && <span className="text-[#101820]/45">{t("admin.consultations.noDate")}</span>}
+                            <input
+                              type="date"
+                              value={b.date || ""}
+                              disabled={consultationDateSavingId === b.id}
+                              onChange={(e) => handleSetConsultationDate(b.id, e.target.value)}
+                              className="bg-[#f4f1eb] border border-[#101820]/15 rounded-lg px-2.5 py-1 text-xs text-[#101820] outline-none focus:border-[#b99a6b] disabled:opacity-50"
+                              title={t("admin.consultations.setDate")}
+                            />
+                            {b.date && (
+                              <button
+                                onClick={() => handleSetConsultationDate(b.id, "")}
+                                disabled={consultationDateSavingId === b.id}
+                                className="text-[#101820]/40 hover:text-[#b3452f] transition-colors disabled:opacity-50"
+                                title={t("admin.consultations.clearDate")}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="flex items-center gap-1.5">
+                              <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" /> {b.date}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Clock3 className="w-3.5 h-3.5 text-[#b99a6b]" /> {formatEstimatedTime(b)}
+                            </span>
+                          </>
+                        )}
                         <span className="flex items-center gap-1.5 text-[#101820]/45">
                           <CalendarClock className="w-3.5 h-3.5" /> {t("admin.consultations.requested", { date: formatCreatedAt(b.created_at) })}
                         </span>

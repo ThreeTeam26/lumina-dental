@@ -36,6 +36,8 @@ class FinanceKpis(BaseModel):
     week_revenue: float
     month_revenue: float
     total_revenue: float
+    fee_revenue: float
+    extra_revenue: float
     pending_payments: float
     total_expenses: float
     net_profit: float

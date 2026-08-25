@@ -12,6 +12,7 @@ import {
   Pencil,
   X,
   KeyRound,
+  Banknote,
 } from "lucide-react";
 import {
   ApiError,
@@ -27,6 +28,8 @@ import {
   createBranchStaff,
   deleteBranchStaff,
   resetBranchStaffPassword,
+  getClinicSchedule,
+  updateConsultationFee,
 } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
@@ -83,6 +86,15 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Clinic-wide default exam fee — the fallback used only when a booking has no
+  // branch, or a branch hasn't set its own exam fee. Per-branch prices below
+  // always win over this (see backend services/booking_service.py).
+  const [feeInput, setFeeInput] = useState("");
+  const [currentFee, setCurrentFee] = useState<number | null>(null);
+  const [savingFee, setSavingFee] = useState(false);
+  const [feeError, setFeeError] = useState("");
+  const [feeSaved, setFeeSaved] = useState(false);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<BranchDraft>(EMPTY_BRANCH);
@@ -131,6 +143,36 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    getClinicSchedule()
+      .then((s) => {
+        setCurrentFee(s.consultation_fee);
+        setFeeInput(s.consultation_fee ? String(s.consultation_fee) : "");
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeeError("");
+    setFeeSaved(false);
+    const fee = parseFloat(feeInput);
+    if (isNaN(fee) || fee < 0) return setFeeError(t("admin.branches.defaultFee.error"));
+    setSavingFee(true);
+    try {
+      const res = await updateConsultationFee(token, fee);
+      setCurrentFee(res.consultation_fee);
+      setFeeSaved(true);
+      setTimeout(() => setFeeSaved(false), 2500);
+    } catch (err) {
+      if (!handleAuthError(err)) {
+        setFeeError(err instanceof ApiError ? err.message : t("admin.branches.defaultFee.saveError"));
+      }
+    } finally {
+      setSavingFee(false);
+    }
+  };
 
   const openNew = () => {
     setEditingId(null);
@@ -468,6 +510,44 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
         </button>
       </div>
 
+      {/* Clinic-wide default exam fee (fallback for branch-less bookings) */}
+      <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h3 className="font-serif text-lg font-medium text-[#101820] flex items-center gap-2">
+            <Banknote className="w-4 h-4 text-[#b99a6b]" /> {t("admin.branches.defaultFee.title")}
+          </h3>
+          <p className="text-xs text-[#101820]/50 mt-1 max-w-md">{t("admin.branches.defaultFee.subtitle")}</p>
+          {currentFee === 0 && <p className="text-[0.7rem] text-amber-700 mt-1.5">{t("admin.branches.defaultFee.notSet")}</p>}
+        </div>
+        <form onSubmit={handleSaveFee} className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.branches.defaultFee.label")}</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={feeInput}
+                onChange={(e) => setFeeInput(e.target.value)}
+                placeholder="0"
+                className="w-32 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-sm text-[#101820] outline-none focus:border-[#b99a6b]"
+              />
+              <span className="text-xs text-[#101820]/50">EGP</span>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={savingFee}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.12em] hover:bg-[#101820]/85 transition-colors disabled:opacity-50"
+          >
+            {savingFee ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {t("admin.branches.defaultFee.save")}
+          </button>
+          {feeSaved && <span className="text-xs text-emerald-700 pb-2.5">{t("admin.branches.defaultFee.saved")}</span>}
+        </form>
+      </div>
+      {feeError && <p className="text-xs text-red-600 -mt-3">{feeError}</p>}
+
       {error && (
         <div className="flex items-center gap-2.5 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -538,13 +618,6 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
                   </button>
                 </div>
               </div>
-              <button
-                onClick={() => openStaffPanel(b)}
-                className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#f4f1eb] border border-[#101820]/10 text-xs text-[#101820] hover:bg-[#101820] hover:text-white transition-colors"
-              >
-                <Users className="w-3.5 h-3.5" />
-                {t("admin.branches.manageStaff")}
-              </button>
             </div>
           ))}
         </div>

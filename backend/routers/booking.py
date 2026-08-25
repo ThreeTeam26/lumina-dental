@@ -31,6 +31,7 @@ from schemas.booking import (
     QueueStatusResponse,
     ArrivalUpdate,
     ConsultationHintUpdate,
+    ConsultationDateUpdate,
     ExtraChargeUpdate,
     MedicalRecordUpdate,
     PaymentConfirmRequest,
@@ -45,6 +46,7 @@ from services.booking_service import (
     confirm_online_payment,
     record_payment,
     register_consultation,
+    set_consultation_date,
     mark_arrival,
     set_consultation_hint,
     set_extra_charge,
@@ -221,6 +223,20 @@ def create_consultation_from_booking(
     current_user: User = Depends(require_staff),
 ):
     return register_consultation(db, booking_id, current_user)
+
+
+@router.patch(
+    "/{booking_id}/consultation-date",
+    response_model=BookingResponse,
+    summary="Set/clear the date on a list-only consultation (staff)",
+)
+def update_consultation_date(
+    booking_id: int,
+    body: ConsultationDateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff),
+):
+    return set_consultation_date(db, booking_id, body.date, current_user)
 
 
 @router.patch(

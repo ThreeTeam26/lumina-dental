@@ -2,44 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  TrendingUp,
-  TrendingDown,
   Wallet,
-  Receipt,
-  Users,
   CalendarDays,
-  Plus,
-  Trash2,
   AlertCircle,
   Loader2,
   Banknote,
   CircleDollarSign,
   Coins,
-  Ban,
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
 import {
   ApiError,
-  Expense,
   FinanceSummary,
   fetchFinanceSummary,
-  fetchExpenses,
-  createExpense,
-  deleteExpense,
-  getClinicSchedule,
-  updateConsultationFee,
 } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 type Preset = "today" | "week" | "month" | "m3" | "m6" | "custom";
 
-const INK = "#101820";
 const GOLD = "#b99a6b";
-const EXPENSE = "#b3452f";
-
-const EXPENSE_CATEGORIES = ["Rent", "Salaries", "Supplies", "Utilities", "Equipment", "Marketing", "Maintenance", "Other"];
 
 const localIso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -95,61 +78,15 @@ export function FinancialDashboard({ token, onAuthError }: { token: string; onAu
   const { start, end } = useMemo(() => rangeFor(preset, customStart, customEnd), [preset, customStart, customEnd]);
 
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Add-expense form
-  const [expForm, setExpForm] = useState({ name: "", category: EXPENSE_CATEGORIES[0], amount: "", date: localIso(new Date()), notes: "" });
-  const [expError, setExpError] = useState("");
-  const [savingExpense, setSavingExpense] = useState(false);
-  const [deletingExpenseId, setDeletingExpenseId] = useState<number | null>(null);
-
-  // Base consultation fee (clinic-wide setting shown to patients at booking)
-  const [feeInput, setFeeInput] = useState("");
-  const [currentFee, setCurrentFee] = useState<number | null>(null);
-  const [savingFee, setSavingFee] = useState(false);
-  const [feeError, setFeeError] = useState("");
-  const [feeSaved, setFeeSaved] = useState(false);
-
-  useEffect(() => {
-    getClinicSchedule()
-      .then((s) => {
-        setCurrentFee(s.consultation_fee);
-        setFeeInput(s.consultation_fee ? String(s.consultation_fee) : "");
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleSaveFee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFeeError("");
-    setFeeSaved(false);
-    const fee = parseFloat(feeInput);
-    if (isNaN(fee) || fee < 0) return setFeeError(t("admin.financial.fee.error"));
-    setSavingFee(true);
-    try {
-      const res = await updateConsultationFee(token, fee);
-      setCurrentFee(res.consultation_fee);
-      setFeeSaved(true);
-      setTimeout(() => setFeeSaved(false), 2500);
-    } catch (err) {
-      setFeeError(err instanceof ApiError ? err.message : t("admin.financial.fee.saveError"));
-    } finally {
-      setSavingFee(false);
-    }
-  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [sum, exp] = await Promise.all([
-        fetchFinanceSummary(token, start, end),
-        fetchExpenses(token, start, end),
-      ]);
+      const sum = await fetchFinanceSummary(token, start, end);
       setSummary(sum);
-      setExpenses(exp);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         onAuthError?.();
@@ -165,41 +102,20 @@ export function FinancialDashboard({ token, onAuthError }: { token: string; onAu
     load();
   }, [load]);
 
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setExpError("");
-    const amount = parseFloat(expForm.amount);
-    if (!expForm.name.trim()) return setExpError(t("admin.financial.nameError"));
-    if (isNaN(amount) || amount < 0) return setExpError(t("admin.financial.amountError"));
-    setSavingExpense(true);
-    try {
-      await createExpense(token, {
-        name: expForm.name.trim(),
-        category: expForm.category.trim() || "Other",
-        amount,
-        date: expForm.date,
-        notes: expForm.notes.trim() || undefined,
-      });
-      setExpForm({ name: "", category: EXPENSE_CATEGORIES[0], amount: "", date: localIso(new Date()), notes: "" });
-      await load();
-    } catch (err) {
-      setExpError(err instanceof ApiError ? err.message : t("admin.financial.saveError"));
-    } finally {
-      setSavingExpense(false);
-    }
-  };
-
-  const handleDeleteExpense = async (id: number) => {
-    setDeletingExpenseId(id);
-    try {
-      await deleteExpense(token, id);
-      await load();
-    } catch {
-      /* keep list as-is on failure */
-    } finally {
-      setDeletingExpenseId(null);
-    }
-  };
+  // The figures are a snapshot from when the view was opened. If the admin
+  // deletes a booking or removes a payment in another tab/window and comes
+  // back here, re-pull so finance never lingers on money that's already gone.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
 
   const currency = summary?.currency ?? "EGP";
   const k = summary?.kpis;
@@ -272,44 +188,6 @@ export function FinancialDashboard({ token, onAuthError }: { token: string; onAu
         </div>
       </div>
 
-      {/* Base consultation fee — the price shown to patients at booking */}
-      <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h3 className="font-serif text-lg font-medium text-[#101820] flex items-center gap-2">
-            <Banknote className="w-4 h-4 text-[#b99a6b]" /> {t("admin.financial.fee.title")}
-          </h3>
-          <p className="text-xs text-[#101820]/50 mt-1 max-w-md">{t("admin.financial.fee.subtitle")}</p>
-          {currentFee === 0 && <p className="text-[0.7rem] text-amber-700 mt-1.5">{t("admin.financial.fee.notSet")}</p>}
-        </div>
-        <form onSubmit={handleSaveFee} className="flex flex-wrap items-end gap-2">
-          <div>
-            <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.financial.fee.label")}</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={feeInput}
-                onChange={(e) => setFeeInput(e.target.value)}
-                placeholder="0"
-                className="w-32 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-sm text-[#101820] outline-none focus:border-[#b99a6b]"
-              />
-              <span className="text-xs text-[#101820]/50">{currency}</span>
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={savingFee}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.12em] hover:bg-[#101820]/85 transition-colors disabled:opacity-50"
-          >
-            {savingFee ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {t("admin.financial.fee.save")}
-          </button>
-          {feeSaved && <span className="text-xs text-emerald-700 pb-2.5">{t("admin.financial.fee.saved")}</span>}
-        </form>
-      </div>
-      {feeError && <p className="text-xs text-red-600 -mt-3">{feeError}</p>}
-
       {error && (
         <div className="flex items-center gap-2.5 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -323,182 +201,29 @@ export function FinancialDashboard({ token, onAuthError }: { token: string; onAu
         </div>
       ) : k ? (
         <>
-          {/* ── KPI cards ──────────────────────────────────────────────────── */}
+          {/* ── Revenue KPIs — total split into its two sources ────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Kpi accent="gold" icon={<Banknote className="w-5 h-5" />} label={t("admin.financial.kpi.totalRevenue")} value={money(k.total_revenue, currency)} />
-            <Kpi
-              accent={k.net_profit >= 0 ? "emerald" : "red"}
-              icon={k.net_profit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              label={t("admin.financial.kpi.netProfit")}
-              value={money(k.net_profit, currency)}
-            />
+            <Kpi accent="gold" icon={<CircleDollarSign className="w-5 h-5" />} label={t("admin.financial.kpi.feeRevenue")} value={money(k.fee_revenue, currency)} />
+            <Kpi accent="gold" icon={<Coins className="w-5 h-5" />} label={t("admin.financial.kpi.extraRevenue")} value={money(k.extra_revenue, currency)} />
             <Kpi accent="amber" icon={<Wallet className="w-5 h-5" />} label={t("admin.financial.kpi.pendingPayments")} value={money(k.pending_payments, currency)} />
-            <Kpi accent="red" icon={<Receipt className="w-5 h-5" />} label={t("admin.financial.kpi.totalExpenses")} value={money(k.total_expenses, currency)} />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <Kpi small icon={<CircleDollarSign className="w-4 h-4" />} label={t("admin.financial.kpi.todayRevenue")} value={money(k.today_revenue, currency)} />
             <Kpi small icon={<CalendarDays className="w-4 h-4" />} label={t("admin.financial.kpi.weekRevenue")} value={money(k.week_revenue, currency)} />
             <Kpi small icon={<CalendarDays className="w-4 h-4" />} label={t("admin.financial.kpi.monthRevenue")} value={money(k.month_revenue, currency)} />
-            <Kpi small icon={<Coins className="w-4 h-4" />} label={t("admin.financial.kpi.avgPerPatient")} value={money(k.avg_revenue_per_patient, currency)} />
-            <Kpi small icon={<Users className="w-4 h-4" />} label={t("admin.financial.kpi.todayPatients")} value={String(k.today_patients)} />
-            <Kpi small icon={<CalendarDays className="w-4 h-4" />} label={t("admin.financial.kpi.todayAppointments")} value={String(k.today_appointments)} />
-            <Kpi small icon={<Ban className="w-4 h-4" />} label={t("admin.financial.kpi.cancelled")} value={String(k.cancelled_appointments)} />
-            <Kpi
-              small
-              accent={summary!.range.net_profit >= 0 ? "emerald" : "red"}
-              icon={summary!.range.net_profit >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-              label={t("admin.financial.kpi.periodProfit")}
-              value={money(summary!.range.net_profit, currency)}
-            />
           </div>
 
-          {/* ── Charts row ─────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2 bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                <h3 className="font-serif text-lg font-medium text-[#101820]">{t("admin.financial.charts.revenueOverTime")}</h3>
-                <div className="flex items-center gap-4 text-[0.7rem] text-[#101820]/60">
-                  <Legend color={GOLD} label={t("admin.financial.charts.revenueLegend")} />
-                  <Legend color={EXPENSE} label={t("admin.financial.charts.expensesLegend")} line />
-                </div>
-              </div>
-              <RevenueChart data={summary!.revenue_series} currency={currency} emptyLabel={t("admin.financial.charts.noData")} />
-            </div>
-
-            <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-serif text-lg font-medium text-[#101820] mb-4">{t("admin.financial.charts.paidVsPending")}</h3>
-              <Donut
-                paid={summary!.payments_breakdown.paid}
-                pending={summary!.payments_breakdown.pending}
-                currency={currency}
-                paidLabel={t("admin.financial.charts.paid")}
-                pendingLabel={t("admin.financial.charts.pending")}
-                emptyLabel={t("admin.financial.charts.noData")}
-              />
-            </div>
-          </div>
-
-          {/* ── Analytics + expenses breakdown ─────────────────────────────── */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                <h3 className="font-serif text-lg font-medium text-[#101820]">{t("admin.financial.charts.apptAnalytics")}</h3>
-                <div className="flex items-center gap-4 text-[0.7rem] text-[#101820]/60">
-                  <Legend color={INK} label={t("admin.financial.charts.apptLegend")} />
-                  <Legend color={GOLD} label={t("admin.financial.charts.patientsLegend")} />
-                </div>
-              </div>
-              <GroupedBars data={summary!.appointments_series} emptyLabel={t("admin.financial.charts.noData")} />
-            </div>
-
-            <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-serif text-lg font-medium text-[#101820] mb-4">{t("admin.financial.charts.expensesByCategory")}</h3>
-              <CategoryBars data={summary!.expenses_by_category} currency={currency} emptyLabel={t("admin.financial.charts.noExpenses")} />
-            </div>
-          </div>
-
-          {/* ── Expense tracking ───────────────────────────────────────────── */}
+          {/* ── Revenue by day ─────────────────────────────────────────────── */}
           <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-serif text-lg font-medium text-[#101820] mb-4 flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-[#b99a6b]" /> {t("admin.financial.expenses.title")}
-            </h3>
-            <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-              <div className="lg:col-span-2">
-                <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.financial.expenses.name")}</label>
-                <input
-                  value={expForm.name}
-                  onChange={(e) => setExpForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder={t("admin.financial.expenses.namePlaceholder")}
-                  className="w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-xs text-[#101820] outline-none focus:border-[#b99a6b]"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="font-serif text-lg font-medium text-[#101820]">{t("admin.financial.charts.revenueByDay")}</h3>
+              <div className="flex items-center gap-4 text-[0.7rem] text-[#101820]/60">
+                <Legend color={GOLD} label={t("admin.financial.charts.revenueLegend")} />
               </div>
-              <div>
-                <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.financial.expenses.category")}</label>
-                <input
-                  list="expense-categories"
-                  value={expForm.category}
-                  onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}
-                  className="w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-xs text-[#101820] outline-none focus:border-[#b99a6b]"
-                />
-                <datalist id="expense-categories">
-                  {EXPENSE_CATEGORIES.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.financial.expenses.amount")} ({currency})</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={expForm.amount}
-                  onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))}
-                  placeholder="0"
-                  className="w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-xs text-[#101820] outline-none focus:border-[#b99a6b]"
-                />
-              </div>
-              <div>
-                <label className="block text-[0.65rem] uppercase tracking-wider text-[#101820]/50 mb-1">{t("admin.financial.expenses.date")}</label>
-                <input
-                  type="date"
-                  value={expForm.date}
-                  onChange={(e) => setExpForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-xs text-[#101820] outline-none focus:border-[#b99a6b]"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={savingExpense}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.12em] hover:bg-[#101820]/85 transition-colors disabled:opacity-50"
-              >
-                {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 text-[#b99a6b]" />}
-                {t("admin.financial.expenses.add")}
-              </button>
-              <div className="lg:col-span-6">
-                <input
-                  value={expForm.notes}
-                  onChange={(e) => setExpForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder={t("admin.financial.expenses.notesPlaceholder")}
-                  className="w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-xs text-[#101820] outline-none focus:border-[#b99a6b]"
-                />
-              </div>
-            </form>
-            {expError && <p className="mt-2 text-xs text-red-600">{expError}</p>}
-
-            {/* Expense list for the selected range */}
-            <div className="mt-5 divide-y divide-[#101820]/5">
-              {expenses.length === 0 ? (
-                <p className="py-6 text-center text-xs text-[#101820]/50">{t("admin.financial.expenses.empty")}</p>
-              ) : (
-                expenses.map((ex) => (
-                  <div key={ex.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-[#101820] truncate">{ex.name}</span>
-                        <span className="shrink-0 text-[0.62rem] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#f4f1eb] border border-[#101820]/10 text-[#101820]/60">{ex.category}</span>
-                      </div>
-                      <div className="text-[0.7rem] text-[#101820]/45 mt-0.5 flex items-center gap-2">
-                        <span>{ex.date}</span>
-                        {ex.notes && <span className="truncate italic">· {ex.notes}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono text-sm font-medium text-[#b3452f]">− {money(ex.amount, currency)}</span>
-                      <button
-                        onClick={() => handleDeleteExpense(ex.id)}
-                        disabled={deletingExpenseId === ex.id}
-                        title={t("admin.financial.expenses.delete")}
-                        className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-600 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
+            <RevenueByDayChart data={summary!.revenue_series} currency={currency} emptyLabel={t("admin.financial.charts.noData")} />
           </div>
 
           {/* ── Recent transactions ────────────────────────────────────────── */}
@@ -618,8 +343,8 @@ function Legend({ color, label, line = false }: { color: string; label: string; 
   );
 }
 
-// ── Revenue over time: bars (revenue) + line (expenses) ─────────────────────
-function RevenueChart({ data, currency, emptyLabel }: { data: { label: string; revenue: number; expenses: number }[]; currency: string; emptyLabel: string }) {
+// ── Revenue by day: one gold bar per day/bucket ─────────────────────────────
+function RevenueByDayChart({ data, currency, emptyLabel }: { data: { label: string; revenue: number }[]; currency: string; emptyLabel: string }) {
   const W = 720;
   const H = 240;
   const padL = 56;
@@ -629,15 +354,15 @@ function RevenueChart({ data, currency, emptyLabel }: { data: { label: string; r
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
 
-  const max = Math.max(1, ...data.map((d) => Math.max(d.revenue, d.expenses)));
+  const max = Math.max(1, ...data.map((d) => d.revenue));
   const niceMax = niceCeil(max);
   const n = data.length || 1;
   const step = chartW / n;
-  const barW = Math.max(2, Math.min(28, step * 0.55));
+  const barW = Math.max(2, Math.min(36, step * 0.6));
   const y = (v: number) => padT + chartH - (v / niceMax) * chartH;
   const cx = (i: number) => padL + step * i + step / 2;
 
-  const total = data.reduce((s, d) => s + d.revenue + d.expenses, 0);
+  const total = data.reduce((s, d) => s + d.revenue, 0);
   const gridVals = [0, 0.25, 0.5, 0.75, 1].map((f) => f * niceMax);
   const labelEvery = Math.ceil(n / 8);
 
@@ -659,18 +384,6 @@ function RevenueChart({ data, currency, emptyLabel }: { data: { label: string; r
             <title>{`${shortLabel(d.label)} · ${money(d.revenue, currency)}`}</title>
           </rect>
         ))}
-        <polyline
-          fill="none"
-          stroke={EXPENSE}
-          strokeWidth={2}
-          strokeLinejoin="round"
-          points={data.map((d, i) => `${cx(i)},${y(d.expenses)}`).join(" ")}
-        />
-        {data.map((d, i) => (
-          <circle key={i} cx={cx(i)} cy={y(d.expenses)} r={2.5} fill={EXPENSE}>
-            <title>{`${shortLabel(d.label)} · ${money(d.expenses, currency)}`}</title>
-          </circle>
-        ))}
         {data.map((d, i) =>
           i % labelEvery === 0 ? (
             <text key={i} x={cx(i)} y={H - 10} textAnchor="middle" fontSize="9" fill="#101820" fillOpacity={0.45}>
@@ -679,164 +392,6 @@ function RevenueChart({ data, currency, emptyLabel }: { data: { label: string; r
           ) : null
         )}
       </svg>
-    </div>
-  );
-}
-
-// ── Grouped bars: appointments + patients ───────────────────────────────────
-function GroupedBars({ data, emptyLabel }: { data: { label: string; appointments: number; patients: number }[]; emptyLabel: string }) {
-  const W = 560;
-  const H = 220;
-  const padL = 34;
-  const padR = 10;
-  const padT = 12;
-  const padB = 26;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
-  const max = Math.max(1, ...data.map((d) => Math.max(d.appointments, d.patients)));
-  const niceMax = niceCeil(max);
-  const n = data.length || 1;
-  const step = chartW / n;
-  const bw = Math.max(2, Math.min(12, (step * 0.6) / 2));
-  const y = (v: number) => padT + chartH - (v / niceMax) * chartH;
-  const gx = (i: number) => padL + step * i + step / 2;
-  const total = data.reduce((s, d) => s + d.appointments + d.patients, 0);
-  const gridVals = [0, 0.5, 1].map((f) => f * niceMax);
-  const labelEvery = Math.ceil(n / 7);
-
-  if (total === 0) return <EmptyChart label={emptyLabel} />;
-
-  return (
-    <div dir="ltr" className="w-full overflow-hidden">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: "auto" }} role="img">
-        {gridVals.map((v, i) => (
-          <g key={i}>
-            <line x1={padL} y1={y(v)} x2={W - padR} y2={y(v)} stroke="#101820" strokeOpacity={0.07} />
-            <text x={padL - 6} y={y(v) + 3} textAnchor="end" fontSize="9" fill="#101820" fillOpacity={0.45}>
-              {Math.round(v)}
-            </text>
-          </g>
-        ))}
-        {data.map((d, i) => (
-          <g key={i}>
-            <rect x={gx(i) - bw - 1} y={y(d.appointments)} width={bw} height={Math.max(0, padT + chartH - y(d.appointments))} rx={1.5} fill={INK}>
-              <title>{`${shortLabel(d.label)} · ${d.appointments}`}</title>
-            </rect>
-            <rect x={gx(i) + 1} y={y(d.patients)} width={bw} height={Math.max(0, padT + chartH - y(d.patients))} rx={1.5} fill={GOLD}>
-              <title>{`${shortLabel(d.label)} · ${d.patients}`}</title>
-            </rect>
-          </g>
-        ))}
-        {data.map((d, i) =>
-          i % labelEvery === 0 ? (
-            <text key={i} x={gx(i)} y={H - 9} textAnchor="middle" fontSize="9" fill="#101820" fillOpacity={0.45}>
-              {shortLabel(d.label)}
-            </text>
-          ) : null
-        )}
-      </svg>
-    </div>
-  );
-}
-
-// ── Paid vs pending donut ───────────────────────────────────────────────────
-function Donut({
-  paid,
-  pending,
-  currency,
-  paidLabel,
-  pendingLabel,
-  emptyLabel,
-}: {
-  paid: number;
-  pending: number;
-  currency: string;
-  paidLabel: string;
-  pendingLabel: string;
-  emptyLabel: string;
-}) {
-  const total = paid + pending;
-  const r = 52;
-  const c = 2 * Math.PI * r;
-  const paidFrac = total > 0 ? paid / total : 0;
-  const pct = (f: number) => `${Math.round(f * 100)}%`;
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <div dir="ltr" className="relative">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle cx="70" cy="70" r={r} fill="none" stroke="#101820" strokeOpacity={0.08} strokeWidth="16" />
-          {total > 0 && (
-            <>
-              <circle
-                cx="70"
-                cy="70"
-                r={r}
-                fill="none"
-                stroke={GOLD}
-                strokeWidth="16"
-                strokeDasharray={`${paidFrac * c} ${c}`}
-                strokeDashoffset={c / 4}
-                transform="rotate(-90 70 70)"
-                strokeLinecap="butt"
-              />
-              <circle
-                cx="70"
-                cy="70"
-                r={r}
-                fill="none"
-                stroke="#d97706"
-                strokeWidth="16"
-                strokeDasharray={`${(1 - paidFrac) * c} ${c}`}
-                strokeDashoffset={c / 4 - paidFrac * c}
-                transform="rotate(-90 70 70)"
-                strokeLinecap="butt"
-              />
-            </>
-          )}
-          <text x="70" y="66" textAnchor="middle" fontSize="11" fill="#101820" fillOpacity={0.5}>
-            {total > 0 ? pct(paidFrac) : ""}
-          </text>
-          <text x="70" y="82" textAnchor="middle" fontSize="9" fill="#101820" fillOpacity={0.4}>
-            {total > 0 ? paidLabel : emptyLabel}
-          </text>
-        </svg>
-      </div>
-      <div className="w-full space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="inline-flex items-center gap-2 text-[#101820]/70">
-            <span className="w-3 h-3 rounded" style={{ background: GOLD }} /> {paidLabel}
-          </span>
-          <span className="font-mono font-medium text-[#101820]">{money(paid, currency)}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="inline-flex items-center gap-2 text-[#101820]/70">
-            <span className="w-3 h-3 rounded" style={{ background: "#d97706" }} /> {pendingLabel}
-          </span>
-          <span className="font-mono font-medium text-amber-700">{money(pending, currency)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Expenses by category (horizontal bars) ──────────────────────────────────
-function CategoryBars({ data, currency, emptyLabel }: { data: { category: string; amount: number }[]; currency: string; emptyLabel: string }) {
-  if (data.length === 0) return <div className="py-10"><EmptyChart label={emptyLabel} /></div>;
-  const max = Math.max(1, ...data.map((d) => d.amount));
-  return (
-    <div className="space-y-3">
-      {data.map((d) => (
-        <div key={d.category}>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-[#101820]/70 font-medium">{d.category}</span>
-            <span className="font-mono text-[#101820]/80">{money(d.amount, currency)}</span>
-          </div>
-          <div className="h-2.5 rounded-full bg-[#f4f1eb] overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${(d.amount / max) * 100}%`, background: GOLD }} />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

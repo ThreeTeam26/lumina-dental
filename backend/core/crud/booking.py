@@ -177,6 +177,18 @@ def create_booking_with_queue_number(db: Session, estimate_fn, **kwargs) -> Book
     raise RuntimeError("Could not assign a unique queue number after several attempts") from last_error
 
 
+def create_list_only_consultation(db: Session, **kwargs) -> Booking:
+    """Create a consultation that lives ONLY in the Consultations list — it
+    never enters a day's queue, so it gets no queue number and no date until
+    staff optionally assign one later. `queue_number is None` is what marks a
+    consultation as list-only (patient-booked consultations always have one)."""
+    booking = Booking(date="", queue_number=None, **kwargs)
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
 def reschedule_booking_with_queue_number(db: Session, booking: Booking, estimate_fn, new_date: str) -> Booking:
     """Move an existing booking to `new_date` in place — assigning a fresh
     queue number for that date at the booking's own branch and recomputing the
