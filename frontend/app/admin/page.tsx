@@ -2201,13 +2201,13 @@ export default function AdminPage() {
                 <table className="w-full min-w-[880px] text-left border-collapse">
                   <thead>
                     <tr className="border-b border-[#101820]/10 bg-[#f4f1eb]/50 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-[#101820]/50">
-                      <th className="py-4 px-6">{t("admin.table.colPatient")}</th>
-                      <th className="py-4 px-6">{t("admin.table.colTreatment")}</th>
-                      <th className="py-4 px-6">{t("admin.table.colDateQueue")}</th>
-                      <th className="py-4 px-6">{t("admin.table.colPayment")}</th>
-                      <th className="py-4 px-6">{t("admin.table.colArrival")}</th>
-                      <th className="py-4 px-6">{t("admin.table.colStatus")}</th>
-                      <th className="py-4 px-6 text-right rtl:text-left">{t("admin.table.colActions")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colPatient")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colTreatment")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colDateQueue")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colPayment")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colArrival")}</th>
+                      <th className="py-4 px-4">{t("admin.table.colStatus")}</th>
+                      <th className="py-4 px-4 text-right rtl:text-left min-w-[176px]">{t("admin.table.colActions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#101820]/5 text-sm">
@@ -2232,30 +2232,30 @@ export default function AdminPage() {
                           className="hover:bg-[#f4f1eb]/40 transition-colors group"
                         >
                           {/* Patient Details */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4">
                             <div className="font-medium text-[#101820]">{b.full_name}</div>
                             <div className="flex items-center gap-3 text-xs text-[#101820]/50 mt-0.5">
-                              <span className="flex items-center gap-1 font-mono">
-                                <Phone className="w-3 h-3 text-[#b99a6b]" /> {b.phone}
+                              <span className="flex items-center gap-1 font-mono whitespace-nowrap">
+                                <Phone className="w-3 h-3 text-[#b99a6b] shrink-0" /> {b.phone}
                               </span>
                               {b.email && (
-                                <span className="flex items-center gap-1 hidden sm:inline-flex">
-                                  <Mail className="w-3 h-3 text-[#101820]/30" /> {b.email}
+                                <span className="flex items-center gap-1 hidden sm:inline-flex whitespace-nowrap">
+                                  <Mail className="w-3 h-3 text-[#101820]/30 shrink-0" /> {b.email}
                                 </span>
                               )}
                             </div>
                           </td>
 
                           {/* Treatment / Service */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4">
                             <div className="flex flex-col items-start gap-1.5">
                               {isConsultation(b) ? (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#b99a6b] text-[#101820] text-xs font-semibold">
-                                  <Stethoscope className="w-3.5 h-3.5" />
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#b99a6b] text-[#101820] text-xs font-semibold whitespace-nowrap">
+                                  <Stethoscope className="w-3.5 h-3.5 shrink-0" />
                                   {t("admin.common.consultationBadge")}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#f4f1eb] border border-[#101820]/10 text-xs font-serif text-[#101820]">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#f4f1eb] border border-[#101820]/10 text-xs font-serif text-[#101820] whitespace-nowrap">
                                   {b.treatment}
                                 </span>
                               )}
@@ -2279,19 +2279,19 @@ export default function AdminPage() {
                           </td>
 
                           {/* Date & Queue */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <div className="flex items-center gap-1.5 text-xs text-[#101820]">
-                              <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" />
+                              <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b] shrink-0" />
                               <span>{b.date}</span>
                             </div>
                             <div className="flex items-center gap-1.5 text-[0.72rem] text-[#101820]/50 mt-0.5">
-                              <ListFilter className="w-3 h-3 text-[#101820]/30" />
+                              <ListFilter className="w-3 h-3 text-[#101820]/30 shrink-0" />
                               <span>{t("admin.agenda.queue", { number: b.queue_number ?? "—" })}</span>
                             </div>
                           </td>
 
                           {/* Payment */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <span
                               className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium border ${
                                 b.payment_method === "online" && b.payment_status === "paid"
@@ -2300,9 +2300,9 @@ export default function AdminPage() {
                               }`}
                             >
                               {b.payment_method === "online" ? (
-                                <CreditCard className="w-3.5 h-3.5" />
+                                <CreditCard className="w-3.5 h-3.5 shrink-0" />
                               ) : (
-                                <Wallet className="w-3.5 h-3.5" />
+                                <Wallet className="w-3.5 h-3.5 shrink-0" />
                               )}
                               {b.payment_method === "online"
                                 ? b.payment_status === "paid"
@@ -2316,7 +2316,7 @@ export default function AdminPage() {
                           </td>
 
                           {/* Arrival */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <button
                               onClick={() => handleToggleArrival(b)}
                               disabled={arrivalUpdatingId === b.id || (!b.patient_arrived && !canMarkEntered(b))}
@@ -2331,13 +2331,13 @@ export default function AdminPage() {
                                   : "bg-[#101820]/5 border border-[#101820]/15 text-[#101820]/60 hover:bg-emerald-500/10 hover:text-emerald-700"
                               }`}
                             >
-                              {b.patient_arrived ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                              {b.patient_arrived ? <UserCheck className="w-3.5 h-3.5 shrink-0" /> : <UserX className="w-3.5 h-3.5 shrink-0" />}
                               {arrivalUpdatingId === b.id ? "…" : b.patient_arrived ? t("admin.common.entered") : t("admin.common.notEntered")}
                             </button>
                           </td>
 
                           {/* Status Dropdown */}
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-4 whitespace-nowrap">
                             <select
                               value={b.status}
                               onChange={(e) =>
@@ -2364,8 +2364,8 @@ export default function AdminPage() {
                           </td>
 
                           {/* Action Buttons */}
-                          <td className="py-4 px-6 text-right rtl:text-left">
-                            <div className="flex items-center justify-end rtl:justify-start gap-2">
+                          <td className="py-4 px-4 text-right rtl:text-left min-w-[176px]">
+                            <div className="flex items-center justify-end rtl:justify-start gap-1.5">
                               <button
                                 onClick={() => handleRecordPayment(b)}
                                 disabled={paymentUpdatingId === b.id || !canRecordPayment(b)}
@@ -2376,13 +2376,13 @@ export default function AdminPage() {
                                     ? t("admin.common.paymentDisabledTitle")
                                     : t("admin.common.payment")
                                 }
-                                className={`p-2 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                className={`shrink-0 p-1.5 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                                   b.payment_status === "paid"
                                     ? "bg-blue-500/10 border-blue-500/30 text-blue-700"
                                     : "bg-[#f4f1eb] hover:bg-blue-500/10 border-[#101820]/10 text-[#101820] hover:text-blue-700"
                                 }`}
                               >
-                                <Wallet className="w-4 h-4" />
+                                <Wallet className="w-4 h-4 shrink-0" />
                               </button>
 
                               {!isConsultation(b) && (
@@ -2396,31 +2396,31 @@ export default function AdminPage() {
                                       ? t("admin.common.registerConsultationDisabledTitle")
                                       : t("admin.common.registerConsultation")
                                   }
-                                  className={`p-2 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                  className={`shrink-0 p-1.5 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                                     b.consultation_registered
                                       ? "bg-[#b99a6b]/20 border-[#b99a6b]/40 text-[#101820]"
                                       : "bg-[#f4f1eb] hover:bg-[#b99a6b]/20 border-[#101820]/10 text-[#101820]"
                                   }`}
                                 >
-                                  <Stethoscope className="w-4 h-4" />
+                                  <Stethoscope className="w-4 h-4 shrink-0" />
                                 </button>
                               )}
 
                               <button
                                 onClick={() => setSelectedBooking(b)}
                                 title={t("admin.table.viewDetails")}
-                                className="p-2 rounded-lg bg-[#f4f1eb] hover:bg-[#101820] hover:text-white border border-[#101820]/10 transition-colors"
+                                className="shrink-0 p-1.5 rounded-lg bg-[#f4f1eb] hover:bg-[#101820] hover:text-white border border-[#101820]/10 transition-colors"
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-4 h-4 shrink-0" />
                               </button>
 
                               <button
                                 onClick={() => handleDelete(b.id)}
                                 disabled={deletingId === b.id}
                                 title={t("admin.table.deleteRecord")}
-                                className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-600 transition-colors"
+                                className="shrink-0 p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-600 transition-colors"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4 shrink-0" />
                               </button>
                             </div>
                           </td>
