@@ -615,17 +615,18 @@ export default function BookingPage() {
             {t("site.booking.description")}
           </p>
 
-          {/* Step indicator */}
-          <ol className="mt-10 flex items-center gap-2 sm:gap-4">
+          {/* Step indicator — sized down on the smallest phones (5 steps in a
+              row can otherwise overflow a ~320px viewport); sm+ unchanged. */}
+          <ol className="mt-10 flex items-center gap-1 sm:gap-4">
             {STEPS.map((s, i) => {
               const indicatorStep = step === "online" ? "payment" : step === "existing" ? "details" : step;
               const currentIndex = STEPS.findIndex((x) => x.id === indicatorStep);
               const isActive = i === currentIndex;
               const isDone = i < currentIndex;
               return (
-                <li key={s.id} className="flex items-center gap-2 sm:gap-4">
+                <li key={s.id} className="flex items-center gap-1 sm:gap-4">
                   <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors sm:h-8 sm:w-8 ${
                       isDone
                         ? "bg-ink text-cream"
                         : isActive
@@ -642,7 +643,7 @@ export default function BookingPage() {
                   >
                     {s.label}
                   </span>
-                  {i < STEPS.length - 1 && <span className="h-px w-6 bg-ink/15 sm:w-10" aria-hidden="true" />}
+                  {i < STEPS.length - 1 && <span className="h-px w-3 shrink-0 bg-ink/15 sm:w-10" aria-hidden="true" />}
                 </li>
               );
             })}
@@ -769,7 +770,7 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {branches.length > 0 && (
                     <button
                       type="button"
@@ -911,7 +912,7 @@ export default function BookingPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setStep("date")}
@@ -941,7 +942,7 @@ export default function BookingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
                   <div>
                     <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.existingName")}</span>
                     <span className="font-serif text-base font-medium text-ink">{activeBooking.full_name}</span>
@@ -1049,7 +1050,7 @@ export default function BookingPage() {
                         </p>
                       </div>
                     )}
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -1090,7 +1091,7 @@ export default function BookingPage() {
                     <p className="flex items-start gap-2 text-sm leading-relaxed text-[#a83b2d]">
                       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {t("site.booking.cancelConfirmText")}
                     </p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
                         onClick={() => setExistingMode("actions")}
@@ -1193,7 +1194,7 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setStep("details")}
@@ -1248,7 +1249,7 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setStep("payment")}
@@ -1291,7 +1292,7 @@ export default function BookingPage() {
                   {t("site.booking.thankYou", { name: fields.fullName })}
                 </p>
 
-                <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
+                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
                   <div>
                     <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.date")}</span>
                     <span className="font-serif text-base font-medium text-ink">{formatDateLong(confirmation.date, locale)}</span>

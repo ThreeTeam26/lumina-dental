@@ -452,7 +452,10 @@ export const translations = {
         doctor: "Doctor",
         clinic: "Clinic",
         bookAppointment: "Book Appointment",
+        bookShort: "Book",
         brandAria: "Lumina Dental — home",
+        openMenuAria: "Open menu",
+        closeMenuAria: "Close menu",
       },
       hero: {
         eyebrow: "Modern Dentistry",
@@ -1225,7 +1228,10 @@ export const translations = {
         doctor: "الدكتور",
         clinic: "العيادة",
         bookAppointment: "احجز دلوقتي",
+        bookShort: "احجز",
         brandAria: "لومينا دنتال — الصفحة الرئيسية",
+        openMenuAria: "افتح القائمة",
+        closeMenuAria: "قفل القائمة",
       },
       hero: {
         eyebrow: "طب أسنان عصري",
