@@ -399,20 +399,20 @@ export function MedicalRecords({
             <p className="text-xs text-[#101820]/50 mt-0.5">{t("admin.records.subtitle")}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-2.5 w-4 h-4 text-[#101820]/40" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("admin.records.searchPlaceholder")}
-              className="w-56 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl pl-9 pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs text-[#101820] outline-none focus:border-blue-500/50"
+              className="w-full sm:w-56 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl pl-9 pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs text-[#101820] outline-none focus:border-blue-500/50"
             />
           </div>
           {!readOnly && (
             <button
               onClick={openNewProfile}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.12em] hover:bg-[#101820]/85 transition-colors"
+              className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.12em] hover:bg-[#101820]/85 transition-colors"
             >
               <Plus className="w-4 h-4 text-blue-300" />
               {t("admin.records.newRecord")}

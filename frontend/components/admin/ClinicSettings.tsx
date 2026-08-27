@@ -602,6 +602,13 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
+                    onClick={() => openStaffPanel(b)}
+                    className="p-1.5 rounded-lg bg-[#f4f1eb] hover:bg-[#101820] hover:text-white border border-[#101820]/15 text-[#101820] transition-colors"
+                    title={t("admin.branches.manageStaff")}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => openEdit(b)}
                     className="p-1.5 rounded-lg bg-[#f4f1eb] hover:bg-[#101820] hover:text-white border border-[#101820]/15 text-[#101820] transition-colors"
                     title={t("admin.branches.edit")}
@@ -731,11 +738,11 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
                     return (
                       <div
                         key={day}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 transition-colors ${
+                        className={`flex flex-col items-stretch gap-1.5 px-2.5 py-1.5 transition-colors sm:flex-row sm:items-center sm:gap-2 ${
                           d.enabled ? "bg-white" : "bg-[#101820]/[0.025]"
                         }`}
                       >
-                        <label className="flex items-center gap-2 w-24 shrink-0 text-[0.7rem] font-medium cursor-pointer select-none">
+                        <label className="flex w-full shrink-0 items-center gap-2 text-[0.7rem] font-medium cursor-pointer select-none sm:w-24">
                           <span className="relative inline-flex h-3.5 w-6 shrink-0 items-center">
                             <input
                               type="checkbox"
@@ -767,7 +774,7 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
                               onChange={(e) =>
                                 setHoursDraft((h) => ({ ...h, [day]: { ...h[day], opens: e.target.value } }))
                               }
-                              className="flex-1 min-w-0 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-lg px-1.5 py-0.5 text-[0.7rem] text-[#101820] outline-none focus:border-[#b99a6b] focus:bg-white"
+                              className="flex-1 min-w-[6.5rem] bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-lg px-1.5 py-0.5 text-[0.7rem] text-[#101820] outline-none focus:border-[#b99a6b] focus:bg-white"
                             />
                             <span className="text-[0.62rem] text-[#101820]/40 shrink-0">{t("admin.branches.toLabel")}</span>
                             <input
@@ -777,7 +784,7 @@ export function ClinicSettings({ token, onAuthError }: { token: string; onAuthEr
                               onChange={(e) =>
                                 setHoursDraft((h) => ({ ...h, [day]: { ...h[day], closes: e.target.value } }))
                               }
-                              className="flex-1 min-w-0 bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-lg px-1.5 py-0.5 text-[0.7rem] text-[#101820] outline-none focus:border-[#b99a6b] focus:bg-white"
+                              className="flex-1 min-w-[6.5rem] bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-lg px-1.5 py-0.5 text-[0.7rem] text-[#101820] outline-none focus:border-[#b99a6b] focus:bg-white"
                             />
                           </div>
                         ) : (

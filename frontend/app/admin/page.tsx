@@ -35,6 +35,7 @@ import {
   CalendarClock,
   Receipt,
   ClipboardList,
+  Menu,
 } from "lucide-react";
 import {
   ApiError,
@@ -193,6 +194,9 @@ export default function AdminPage() {
   const [viewMode, setViewMode] = useState<
     "agenda" | "table" | "consultations" | "financial" | "records" | "branches"
   >("agenda");
+  // On mobile the tab switcher collapses into a dropdown (like the public
+  // site's navbar menu) instead of a horizontally-scrolling row.
+  const [tabMenuOpen, setTabMenuOpen] = useState(false);
 
   // Only the ADMIN role may manage clinic branches or see Financial/Records —
   // fetched once per login so those tabs aren't shown to staff accounts that
@@ -340,6 +344,19 @@ export default function AdminPage() {
     if (savedToken) {
       setTokenState(savedToken);
     }
+  }, []);
+
+  // Close the mobile tab dropdown once picking a view, and if the viewport
+  // grows past `sm` (where the tabs show inline instead) so it can't be left
+  // open behind the row that replaces it.
+  useEffect(() => {
+    setTabMenuOpen(false);
+  }, [viewMode]);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const onChange = () => setTabMenuOpen(false);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   // Fetch bookings when token is present, and again whenever the admin
@@ -1291,93 +1308,119 @@ export default function AdminPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* View Mode Switcher */}
-            <div className="flex items-center p-1 rounded-xl bg-white border border-[#101820]/10 shadow-sm">
-              <button
-                onClick={() => setViewMode("agenda")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                  viewMode === "agenda"
-                    ? "bg-[#101820] text-[#f4f1eb] shadow"
-                    : "text-[#101820]/60 hover:text-[#101820]"
-                }`}
-              >
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span>{t("admin.header.dayAgenda")}</span>
-              </button>
-              <button
-                onClick={() => setViewMode("table")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                  viewMode === "table"
-                    ? "bg-[#101820] text-[#f4f1eb] shadow"
-                    : "text-[#101820]/60 hover:text-[#101820]"
-                }`}
-              >
-                <ListFilter className="w-3.5 h-3.5" />
-                <span>{t("admin.header.allBookings")}</span>
-              </button>
-              <button
-                onClick={() => setViewMode("consultations")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                  viewMode === "consultations"
-                    ? "bg-[#101820] text-[#f4f1eb] shadow"
-                    : "text-[#101820]/60 hover:text-[#101820]"
-                }`}
-              >
-                <Stethoscope className="w-3.5 h-3.5" />
-                <span>{t("admin.header.consultations")}</span>
-                {consultationBookings.length + completedExamsWithConsultation.length > 0 && (
-                  <span
-                    className={`ml-0.5 rtl:ml-0 rtl:mr-0.5 rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none ${
-                      viewMode === "consultations"
-                        ? "bg-[#b99a6b] text-[#101820]"
-                        : "bg-[#101820]/10 text-[#101820]"
-                    }`}
-                  >
-                    {consultationBookings.length + completedExamsWithConsultation.length}
-                  </span>
-                )}
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setViewMode("financial")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                    viewMode === "financial"
-                      ? "bg-[#101820] text-[#f4f1eb] shadow"
-                      : "text-[#101820]/60 hover:text-[#101820]"
-                  }`}
-                >
-                  <Wallet className="w-3.5 h-3.5" />
-                  <span>{t("admin.header.financial")}</span>
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => setViewMode("records")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                    viewMode === "records"
-                      ? "bg-[#101820] text-[#f4f1eb] shadow"
-                      : "text-[#101820]/60 hover:text-[#101820]"
-                  }`}
-                >
-                  <ClipboardList className="w-3.5 h-3.5" />
-                  <span>{t("admin.header.records")}</span>
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => setViewMode("branches")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
-                    viewMode === "branches"
-                      ? "bg-[#101820] text-[#f4f1eb] shadow"
-                      : "text-[#101820]/60 hover:text-[#101820]"
-                  }`}
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span>{t("admin.branches.title")}</span>
-                </button>
-              )}
-            </div>
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-3 sm:w-auto">
+            {/* View Mode Switcher — up to 6 tabs is wider than a phone screen,
+                so this scrolls horizontally there instead of overflowing the
+                page (same pattern as the day-picker pills below). w-full (not
+                just max-w-full) forces it onto its own row so it actually
+                gets the full viewport width to scroll within, rather than
+                fighting the buttons after it for space on one flex line. */}
+            {(() => {
+              const consultationBadge = consultationBookings.length + completedExamsWithConsultation.length;
+              const tabs = [
+                { id: "agenda" as const, label: t("admin.header.dayAgenda"), icon: CalendarDays },
+                { id: "table" as const, label: t("admin.header.allBookings"), icon: ListFilter },
+                { id: "consultations" as const, label: t("admin.header.consultations"), icon: Stethoscope, badge: consultationBadge },
+                ...(isAdmin
+                  ? [
+                      { id: "financial" as const, label: t("admin.header.financial"), icon: Wallet },
+                      { id: "records" as const, label: t("admin.header.records"), icon: ClipboardList },
+                      { id: "branches" as const, label: t("admin.branches.title"), icon: Building2 },
+                    ]
+                  : []),
+              ];
+              const activeTab = tabs.find((tab) => tab.id === viewMode) ?? tabs[0];
+              return (
+                <>
+                  {/* sm+: the original inline row, unchanged — scrolls horizontally
+                      only in the unlikely case it still doesn't fit. */}
+                  <div className="hidden w-full min-w-0 items-center gap-0.5 overflow-x-auto rounded-xl bg-white border border-[#101820]/10 p-1 shadow-sm sm:flex sm:w-auto sm:gap-0">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setViewMode(tab.id)}
+                          className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-[0.12em] transition-all ${
+                            viewMode === tab.id
+                              ? "bg-[#101820] text-[#f4f1eb] shadow"
+                              : "text-[#101820]/60 hover:text-[#101820]"
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{tab.label}</span>
+                          {!!tab.badge && (
+                            <span
+                              className={`ml-0.5 rtl:ml-0 rtl:mr-0.5 rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none ${
+                                viewMode === tab.id ? "bg-[#b99a6b] text-[#101820]" : "bg-[#101820]/10 text-[#101820]"
+                              }`}
+                            >
+                              {tab.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Below sm: collapses into a dropdown, same pattern as the
+                      public site's navbar hamburger menu — a button showing the
+                      active tab that expands into a full-width list. */}
+                  <div className="relative w-full sm:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setTabMenuOpen((open) => !open)}
+                      aria-expanded={tabMenuOpen}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl bg-white border border-[#101820]/10 px-3 py-2 shadow-sm text-xs font-medium uppercase tracking-[0.12em] text-[#101820]"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <activeTab.icon className="w-3.5 h-3.5" />
+                        {activeTab.label}
+                        {!!activeTab.badge && (
+                          <span className="rounded-full bg-[#b99a6b]/20 px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none text-[#101820]">
+                            {activeTab.badge}
+                          </span>
+                        )}
+                      </span>
+                      {tabMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                    </button>
+                    {tabMenuOpen && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1.5 overflow-hidden rounded-xl border border-[#101820]/10 bg-white shadow-lg">
+                        {tabs.map((tab) => {
+                          const Icon = tab.icon;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => {
+                                setViewMode(tab.id);
+                                setTabMenuOpen(false);
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-xs font-medium uppercase tracking-[0.12em] transition-colors ${
+                                viewMode === tab.id
+                                  ? "bg-[#101820] text-[#f4f1eb]"
+                                  : "text-[#101820]/70 hover:bg-[#f4f1eb]"
+                              }`}
+                            >
+                              <Icon className="w-3.5 h-3.5" />
+                              <span>{tab.label}</span>
+                              {!!tab.badge && (
+                                <span
+                                  className={`ml-auto rtl:ml-0 rtl:mr-auto rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none ${
+                                    viewMode === tab.id ? "bg-[#b99a6b] text-[#101820]" : "bg-[#101820]/10 text-[#101820]"
+                                  }`}
+                                >
+                                  {tab.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
 
             <LanguageToggle className="bg-white border border-[#101820]/10 shadow-sm text-[#101820]/70 hover:text-[#101820]" />
 
@@ -1386,10 +1429,11 @@ export default function AdminPage() {
                 setNewForm((prev) => ({ ...prev, date: selectedDate }));
                 setShowNewModal(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#101820]/85 transition-colors shadow-sm"
+              className="inline-flex shrink-0 items-center gap-2 px-3 py-2 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium uppercase tracking-[0.15em] hover:bg-[#101820]/85 transition-colors shadow-sm sm:px-4"
             >
               <Plus className="w-4 h-4 text-[#b99a6b]" />
-              <span>{t("admin.header.newAppointment")}</span>
+              <span className="sm:hidden">{t("admin.header.newAppointmentShort")}</span>
+              <span className="hidden sm:inline">{t("admin.header.newAppointment")}</span>
             </button>
 
             <div className="relative flex items-center">
@@ -2151,7 +2195,10 @@ export default function AdminPage() {
             {/* Table Container */}
             <div className="bg-white border border-[#101820]/10 rounded-2xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                {/* min-w keeps every column's natural width instead of letting
+                    a narrow phone crush them into unreadable wrapped/truncated
+                    text — the wrapper above scrolls horizontally instead. */}
+                <table className="w-full min-w-[880px] text-left border-collapse">
                   <thead>
                     <tr className="border-b border-[#101820]/10 bg-[#f4f1eb]/50 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-[#101820]/50">
                       <th className="py-4 px-6">{t("admin.table.colPatient")}</th>
