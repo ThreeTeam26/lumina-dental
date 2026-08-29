@@ -34,6 +34,10 @@ export function Hero() {
 
   useIsoLayoutEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // The pinned cinematic only suits desktop (lg+): on a short mobile viewport
+    // the hero already overflows 100svh, and pinning it (with overflow-hidden)
+    // both clips that overflow and forces a long scrub-scroll before it leaves.
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
     const copy = [
       eyebrowRef.current,
       headingRef.current,
@@ -77,6 +81,9 @@ export function Hero() {
       });
 
       // Pinned cinematic timeline — scrubbed by scroll through the Hero.
+      // Desktop only: on mobile the hero scrolls away as a normal section so it
+      // stays fully visible and doesn't trap the scroll (see isDesktop above).
+      if (!isDesktop) return;
       gsap
         .timeline({
           scrollTrigger: {
@@ -177,7 +184,7 @@ export function Hero() {
         {/* RIGHT — 3D tooth (bottom on mobile, right on desktop) */}
         <div
           ref={visualRef}
-          className="relative order-2 h-[44svh] w-full min-h-[300px] sm:h-[50svh] lg:order-2 lg:h-[92svh]"
+          className="relative order-2 h-[34svh] w-full min-h-[240px] sm:h-[46svh] lg:order-2 lg:h-[92svh]"
         >
           <ToothScene scrollProgress={scrollProgress} />
 

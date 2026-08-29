@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Alexandria } from "next/font/google";
 import "./globals.css";
-import { SmoothScroll } from "@/components/providers/SmoothScroll";
 import { CLINIC, REVIEW_SUMMARY } from "@/lib/constants";
 
 const playfair = localFont({
@@ -120,7 +119,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <SmoothScroll>{children}</SmoothScroll>
+        {children}
       </body>
     </html>
   );

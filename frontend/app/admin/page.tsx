@@ -121,6 +121,14 @@ function useWheelHorizontalScroll(ref: React.RefObject<HTMLDivElement | null>, a
     if (!container) return;
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY === 0) return;
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      // Nothing to scroll sideways here → let the wheel scroll the page.
+      if (maxScroll <= 1) return;
+      const atStart = container.scrollLeft <= 0;
+      const atEnd = container.scrollLeft >= maxScroll - 1;
+      // At the strip's horizontal edge in the wheel's direction → release the
+      // wheel back to the page so vertical scrolling never gets stuck here.
+      if ((e.deltaY > 0 && atEnd) || (e.deltaY < 0 && atStart)) return;
       e.preventDefault();
       container.scrollLeft += e.deltaY;
     };

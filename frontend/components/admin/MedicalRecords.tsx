@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   CalendarClock,
   Pencil,
+  Download,
 } from "lucide-react";
 import {
   ApiError,
@@ -100,7 +101,7 @@ export function MedicalRecords({
    *  images — only the ADMIN role may, matching the backend's restriction. */
   readOnly?: boolean;
 }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -359,6 +360,107 @@ export function MedicalRecords({
     }
   };
 
+  // Build a clean, self-contained printable page of the WHOLE record (profile +
+  // every dated visit + images) and hand it to the browser's print dialog, whose
+  // default destination is "Save as PDF". Done via the browser so Arabic RTL
+  // text, selectable text, pagination and images all just work — no PDF library.
+  const downloadRecordPdf = (record: MedicalRecord) => {
+    const isRtl = locale === "ar";
+    const esc = (s: unknown) =>
+      String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
+    const genderLabel =
+      record.gender === "male" ? t("admin.records.male")
+      : record.gender === "female" ? t("admin.records.female")
+      : record.gender === "other" ? t("admin.records.other")
+      : "—";
+
+    const fieldRows = (e: MedicalRecordEntry) =>
+      ([
+        [t("admin.records.diagnosis"), e.diagnosis],
+        [t("admin.records.symptoms"), e.symptoms],
+        [t("admin.records.prescription"), e.prescription],
+        [t("admin.records.chronic"), e.chronic_conditions],
+        [t("admin.records.medications"), e.current_medications],
+        [t("admin.records.notes"), e.notes],
+      ] as [string, string | null | undefined][])
+        .filter(([, v]) => v && String(v).trim())
+        .map(([k, v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`)
+        .join("");
+
+    const entriesHtml = record.entries.length === 0
+      ? `<p class="muted">${esc(t("admin.records.noVisits"))}</p>`
+      : record.entries
+          .map((e) => {
+            const follow = e.follow_up_needed
+              ? `<div class="row"><span class="k">${esc(t("admin.records.followUpShort"))}</span><span class="v">${esc(e.follow_up_notes || "✓")}</span></div>`
+              : "";
+            const imgs = e.images.length
+              ? `<div class="imgs-label">${esc(t("admin.records.pdfImages"))}</div><div class="imgs">${e.images
+                  .map((im) => `<img src="${esc(mediaUrl(im.url))}" alt="" />`)
+                  .join("")}</div>`
+              : "";
+            return `<div class="entry"><div class="entry-date">${esc(formatDate(e.date))}</div>${fieldRows(e)}${follow}${imgs}</div>`;
+          })
+          .join("");
+
+    const html = `<!doctype html><html lang="${isRtl ? "ar" : "en"}" dir="${isRtl ? "rtl" : "ltr"}"><head><meta charset="utf-8"/>
+<title>${esc(t("admin.records.pdfTitle"))} — ${esc(record.patient_name)}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", Arial, sans-serif; color: #101820; margin: 0; line-height: 1.6; }
+  header { border-bottom: 2px solid #b99a6b; padding-bottom: 10px; margin-bottom: 16px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  header .clinic { font-size: 20px; font-weight: 700; letter-spacing: .05em; }
+  header .clinic b { color: #b99a6b; }
+  header .doc { font-size: 12px; color: #101820; opacity: .55; text-transform: uppercase; letter-spacing: .12em; }
+  .profile { background: #f4f1eb; border: 1px solid #e6e0d4; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; }
+  .profile h2 { margin: 0 0 8px; font-size: 22px; }
+  .profile .grid { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 13px; }
+  .k { color: #101820; opacity: .45; margin-inline-end: 6px; }
+  .entry { border: 1px solid #e2ddd2; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+  .entry-date { display: inline-block; font-weight: 700; font-size: 13px; background: #101820; color: #fff; border-radius: 8px; padding: 3px 10px; margin-bottom: 8px; }
+  .row { font-size: 13px; margin: 3px 0; }
+  .row .v { white-space: pre-wrap; }
+  .muted { color: #101820; opacity: .5; font-size: 13px; }
+  .imgs-label { font-size: 11px; opacity: .5; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .1em; }
+  .imgs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .imgs img { width: 46%; max-height: 240px; object-fit: contain; border: 1px solid #e2ddd2; border-radius: 8px; }
+  footer { margin-top: 18px; padding-top: 10px; border-top: 1px solid #e2ddd2; font-size: 11px; opacity: .5; }
+  @media print { .imgs img { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head><body>
+  <header>
+    <div class="clinic">${esc(t("admin.records.pdfClinic"))}</div>
+    <div class="doc">${esc(t("admin.records.pdfTitle"))}</div>
+  </header>
+  <section class="profile">
+    <h2>${esc(record.patient_name)}</h2>
+    <div class="grid">
+      <div><span class="k">${esc(t("admin.records.gender"))}</span>${esc(genderLabel)}</div>
+      <div><span class="k">${esc(t("admin.records.age"))}</span>${esc(record.age ?? "—")}</div>
+      <div><span class="k">${esc(t("admin.records.phone"))}</span>${esc(record.phone || "—")}</div>
+    </div>
+  </section>
+  <section>${entriesHtml}</section>
+  <footer>${esc(t("admin.records.pdfGenerated"))}: ${esc(new Date().toLocaleString(isRtl ? "ar-EG-u-nu-latn" : "en-US"))}</footer>
+  <script>
+    window.addEventListener("load", function () {
+      var imgs = Array.prototype.slice.call(document.images);
+      Promise.all(imgs.map(function (i) { return i.complete ? Promise.resolve() : new Promise(function (r) { i.onload = i.onerror = r; }); }))
+        .then(function () { setTimeout(function () { window.focus(); window.print(); }, 250); });
+    });
+  <\/script>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert(t("admin.records.pdfPopupBlocked"));
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   const inputClass =
     "w-full bg-[#f4f1eb]/60 border border-[#101820]/15 rounded-xl px-3 py-2 text-sm text-[#101820] outline-none focus:border-blue-500/50";
   const areaClass = inputClass + " resize-none";
@@ -531,9 +633,20 @@ export function MedicalRecords({
                   {editingProfileId == null ? t("admin.records.newRecord") : profileDraft.patient_name || t("admin.records.recordLabel")}
                 </h3>
               </div>
-              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-full bg-[#f4f1eb] hover:bg-[#101820] hover:text-white text-[#101820]/60 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {activeRecord && (
+                  <button
+                    onClick={() => downloadRecordPdf(activeRecord)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#101820] text-[#f4f1eb] text-xs font-medium hover:bg-[#101820]/85 transition-colors"
+                    title={t("admin.records.downloadPdf")}
+                  >
+                    <Download className="w-3.5 h-3.5" /> {t("admin.records.downloadPdf")}
+                  </button>
+                )}
+                <button onClick={() => setShowForm(false)} className="p-1.5 rounded-full bg-[#f4f1eb] hover:bg-[#101820] hover:text-white text-[#101820]/60 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Profile: fixed identity data */}
