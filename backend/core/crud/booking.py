@@ -7,7 +7,7 @@ import re
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import date, datetime
 
 from core.database import Booking, BookingStatus
 
@@ -37,17 +37,25 @@ def _phones_match(a: str | None, b: str | None) -> bool:
 
 
 def find_active_booking_for_phone(db: Session, phone: str) -> Booking | None:
-    """Return this phone's outstanding (pending/confirmed) booking, if any —
-    used to enforce one active booking per patient. Completed and cancelled
-    bookings don't count, so a patient can book again once their current
-    appointment is finished. Filtering is done in Python so the match is
-    tolerant of phone formatting; the active set is small in practice."""
+    """Return this phone's still-live booking, if any — used to enforce one
+    active booking per patient. A booking only counts as live while it's still
+    an UPCOMING visit the patient hasn't been seen for yet, so it stops blocking
+    a new booking once:
+      • its date has passed (expired — the day came and went), or
+      • the patient was checked in (patient_arrived — the visit happened).
+    Completed/cancelled bookings never count either. Filtering is done in Python
+    so the phone match is format-tolerant; the candidate set is small."""
+    today = date.today().isoformat()
     outstanding = (
         db.query(Booking)
         .filter(Booking.status.in_(STILL_WAITING_STATUSES))
         .all()
     )
     for booking in outstanding:
+        if booking.patient_arrived:
+            continue
+        if not booking.date or booking.date < today:
+            continue
         if _phones_match(booking.phone, phone):
             return booking
     return None

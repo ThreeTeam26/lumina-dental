@@ -214,3 +214,20 @@ html[lang="ar"] h4 {
     scroll-behavior: auto !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Mobile <input type="date"> (iOS Safari)
+   iOS sizes date inputs to an intrinsic width that ignores width:100% and
+   overflows narrow screens (and clips the picker affordance). Reset their
+   appearance on small screens so they fill their container — the native date
+   picker still opens on tap. Desktop keeps the default calendar-icon styling.
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}

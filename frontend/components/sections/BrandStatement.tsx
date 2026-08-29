@@ -37,7 +37,7 @@ export function BrandStatement() {
     <section
       ref={sectionRef}
       id="brand-statement"
-      className="relative w-full bg-cream px-6 py-28 md:px-10 md:py-40 lg:px-14 lg:py-48"
+      className="relative w-full bg-cream px-6 pt-8 pb-24 md:px-10 md:py-40 lg:px-14 lg:py-48"
     >
       <div className="mx-auto max-w-[110rem]">
         {/* Eyebrow */}

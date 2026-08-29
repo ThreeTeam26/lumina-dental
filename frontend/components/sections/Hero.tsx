@@ -122,9 +122,9 @@ export function Hero() {
     <section
       ref={sectionRef}
       id="hero"
-      className="relative min-h-[100svh] w-full overflow-hidden bg-cream"
+      className="relative w-full overflow-hidden bg-cream lg:min-h-[100svh]"
     >
-      <div className="mx-auto grid min-h-[100svh] max-w-[110rem] grid-cols-1 items-center gap-4 px-6 pb-10 pt-24 md:px-10 sm:gap-6 sm:pb-16 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:px-14 lg:pb-0 lg:pt-0">
+      <div className="mx-auto grid max-w-[110rem] grid-cols-1 items-center gap-4 px-6 pb-8 pt-24 md:px-10 sm:gap-6 sm:pb-10 sm:pt-28 lg:min-h-[100svh] lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:px-14 lg:pb-0 lg:pt-0">
         {/* LEFT — editorial copy (top on mobile, left on desktop) */}
         <div className="relative z-10 order-1 max-w-xl lg:order-1">
           {/* Eyebrow */}
@@ -184,7 +184,7 @@ export function Hero() {
         {/* RIGHT — 3D tooth (bottom on mobile, right on desktop) */}
         <div
           ref={visualRef}
-          className="relative order-2 h-[34svh] w-full min-h-[240px] sm:h-[46svh] lg:order-2 lg:h-[92svh]"
+          className="relative order-2 h-[46svh] w-full min-h-[320px] sm:h-[52svh] lg:order-2 lg:h-[92svh]"
         >
           <ToothScene scrollProgress={scrollProgress} />
 
