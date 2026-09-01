@@ -613,7 +613,10 @@ export default function AdminPage() {
   // twice for the same visit — mirrors the backend's own gate in
   // services/booking_service.py record_payment, so the button's disabled
   // state matches what the server would actually allow.
-  const canRecordPayment = (b: Booking) => b.status === "confirmed" && b.payment_status !== "paid";
+  // Payment is settled at the clinic, so it can't be recorded before the
+  // booking day has arrived (a future-dated visit hasn't happened yet).
+  const canRecordPayment = (b: Booking) =>
+    b.status === "confirmed" && b.payment_status !== "paid" && (!b.date || b.date <= todayIso());
 
   const handleRecordPayment = async (b: Booking) => {
     if (!canRecordPayment(b)) return;
@@ -1053,9 +1056,10 @@ export default function AdminPage() {
     return bookings
       .filter((b) => {
         if (!isConsultation(b)) return false;
-        // The Consultations list is a work-queue of requests still to handle —
-        // once a consultation is confirmed / cancelled / completed it drops off.
-        if (b.status !== "pending") return false;
+        // The Consultations list is a work-queue of visits still to happen — a
+        // consultation stays (through confirm & payment) until the patient
+        // actually attends it (or it's cancelled), then it drops off.
+        if (b.patient_arrived || b.status === "cancelled" || b.status === "completed") return false;
         if (!query) return true;
 
         const phoneDigits = digitsOf(b.phone);
@@ -1172,7 +1176,10 @@ export default function AdminPage() {
         };
       }
     }
-    return { bookings, caption: t("admin.stats.allTime") };
+    // Exclude list-only consultations here too — they live only in the
+    // Consultations tab, never the schedule/table, so counting them in these
+    // cards would show a total the table below can never match.
+    return { bookings: bookings.filter((b) => !isListOnlyConsultation(b)), caption: t("admin.stats.allTime") };
   }, [viewMode, agendaBookings, filteredBookings, bookings, selectedDateFormatted, selectedTableDay, selectedMonth, selectedYear, datePreset, t]);
 
   // Statistics calculation — scoped to `statsScope`, not always every booking.
@@ -1750,7 +1757,7 @@ export default function AdminPage() {
                         {/* Payment Badge */}
                         <span
                           className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium border ${
-                            b.payment_method === "online" && b.payment_status === "paid"
+                            b.payment_status === "paid"
                               ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
                               : "bg-amber-500/10 border-amber-500/30 text-amber-800"
                           }`}
@@ -1760,10 +1767,12 @@ export default function AdminPage() {
                           ) : (
                             <Wallet className="w-3.5 h-3.5" />
                           )}
-                          {b.payment_method === "online"
-                            ? b.payment_status === "paid"
+                          {b.payment_status === "paid"
+                            ? b.payment_method === "online"
                               ? t("admin.common.paidOnline")
-                              : t("admin.common.onlinePending")
+                              : t("admin.common.paidAtClinic")
+                            : b.payment_method === "online"
+                            ? t("admin.common.onlinePending")
                             : t("admin.common.payAtClinic")}
                         </span>
 
@@ -2302,7 +2311,7 @@ export default function AdminPage() {
                           <td className="py-4 px-4 whitespace-nowrap">
                             <span
                               className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium border ${
-                                b.payment_method === "online" && b.payment_status === "paid"
+                                b.payment_status === "paid"
                                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
                                   : "bg-amber-500/10 border-amber-500/30 text-amber-800"
                               }`}
@@ -2312,10 +2321,12 @@ export default function AdminPage() {
                               ) : (
                                 <Wallet className="w-3.5 h-3.5 shrink-0" />
                               )}
-                              {b.payment_method === "online"
-                                ? b.payment_status === "paid"
+                              {b.payment_status === "paid"
+                                ? b.payment_method === "online"
                                   ? t("admin.common.paidOnline")
-                                  : t("admin.common.onlinePending")
+                                  : t("admin.common.paidAtClinic")
+                                : b.payment_method === "online"
+                                ? t("admin.common.onlinePending")
                                 : t("admin.table.pendingPayAtClinic")}
                             </span>
                             {b.extra_charge_amount ? (
@@ -2344,14 +2355,10 @@ export default function AdminPage() {
                             </button>
                           </td>
 
-                          {/* Status Dropdown */}
+                          {/* Status — display only (change it from the Day Agenda). */}
                           <td className="py-4 px-4 whitespace-nowrap">
-                            <select
-                              value={b.status}
-                              onChange={(e) =>
-                                handleStatusChange(b.id, e.target.value as BookingStatus)
-                              }
-                              className={`text-xs font-medium px-3 py-1.5 rounded-xl border outline-none cursor-pointer transition-all ${
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border ${
                                 b.status === "confirmed"
                                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800"
                                   : b.status === "completed"
@@ -2361,14 +2368,25 @@ export default function AdminPage() {
                                   : "bg-amber-500/10 border-amber-500/30 text-amber-800"
                               }`}
                             >
-                              <option value="pending">🟡 {t("admin.table.statusPending")}</option>
-                              <option value="confirmed">🟢 {t("admin.table.statusConfirmed")}</option>
-                              {/* Retired: "completed" is no longer settable (see change_booking_status
-                                  on the backend) — kept only so a booking that already carries this
-                                  status from before still displays correctly in the dropdown. */}
-                              <option value="completed" disabled>🔵 {t("admin.table.statusCompleted")}</option>
-                              <option value="cancelled">🔴 {t("admin.table.statusCancelled")}</option>
-                            </select>
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  b.status === "confirmed"
+                                    ? "bg-emerald-600"
+                                    : b.status === "completed"
+                                    ? "bg-blue-600"
+                                    : b.status === "cancelled"
+                                    ? "bg-red-600"
+                                    : "bg-amber-500"
+                                }`}
+                              />
+                              {b.status === "confirmed"
+                                ? t("admin.table.statusConfirmed")
+                                : b.status === "completed"
+                                ? t("admin.table.statusCompleted")
+                                : b.status === "cancelled"
+                                ? t("admin.table.statusCancelled")
+                                : t("admin.table.statusPending")}
+                            </span>
                           </td>
 
                           {/* Action Buttons */}
@@ -2686,6 +2704,19 @@ export default function AdminPage() {
                           }`}
                         >
                           {t("admin.common.cancel")}
+                        </button>
+                      </div>
+
+                      {/* Mark the patient as having attended their consultation —
+                          this saves the attendance and drops it off the list. */}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <button
+                          onClick={() => handleToggleArrival(b)}
+                          disabled={arrivalUpdatingId === b.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-600 text-white shadow hover:bg-emerald-700 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          {arrivalUpdatingId === b.id ? t("admin.common.updating") : t("admin.consultations.markAttended")}
                         </button>
                       </div>
                     </div>
