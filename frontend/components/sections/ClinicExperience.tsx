@@ -122,6 +122,7 @@ export function ClinicExperience() {
         <div className="relative mt-12 flex-1 lg:mt-14">
           <div
             ref={wrapperRef}
+            dir="ltr"
             className="h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden lg:snap-none [scrollbar-width:none] motion-safe:lg:overflow-hidden [&::-webkit-scrollbar]:hidden"
           >
             <div

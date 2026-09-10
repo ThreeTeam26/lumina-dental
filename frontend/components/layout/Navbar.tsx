@@ -84,18 +84,20 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
         {minimal ? (
           <Link
             href="/"
-            className="whitespace-nowrap text-sm font-medium uppercase tracking-[0.18em] text-ink transition-opacity hover:opacity-70 sm:tracking-[0.28em]"
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-medium uppercase tracking-[0.18em] text-ink transition-opacity hover:opacity-70 sm:tracking-[0.28em]"
             aria-label={t("site.nav.brandAria")}
           >
-            Lumina <span className="text-gold">Dental</span>
+            <img src="/images/elan-mark-dark.png" alt="" className="h-5 w-auto object-contain" />
+            Èlan <span className="text-gold">Studio</span>
           </Link>
         ) : (
           <a
             href="#hero"
-            className="whitespace-nowrap text-sm font-medium uppercase tracking-[0.18em] text-ink transition-opacity hover:opacity-70 sm:tracking-[0.28em]"
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-medium uppercase tracking-[0.18em] text-ink transition-opacity hover:opacity-70 sm:tracking-[0.28em]"
             aria-label={t("site.nav.brandAria")}
           >
-            Lumina <span className="text-gold">Dental</span>
+            <img src="/images/elan-mark-dark.png" alt="" className="h-5 w-auto object-contain" />
+            Èlan <span className="text-gold">Studio</span>
           </a>
         )}
 
