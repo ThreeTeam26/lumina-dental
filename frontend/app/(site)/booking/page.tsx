@@ -103,8 +103,8 @@ function isValidEgyptPhone(raw: string): boolean {
 }
 
 const inputBase =
-  "w-full rounded-xl border bg-white/60 px-4 py-3 text-ink outline-none transition-colors duration-200 placeholder:text-ink/35 focus:border-gold focus:ring-2 focus:ring-gold/25";
-const labelBase = "mb-2 block text-xs font-medium uppercase tracking-[0.15em] text-ink/60";
+  "w-full rounded-xl border bg-white/60 px-4 py-3 text-ink dark:text-cream outline-none transition-colors duration-200 placeholder:text-ink/35 dark:text-cream/35 focus:border-gold focus:ring-2 focus:ring-gold/25";
+const labelBase = "mb-2 block text-xs font-medium uppercase tracking-[0.15em] text-ink/60 dark:text-cream/60";
 
 // Saturday-first — matches how the clinic's own week reads (open Sat–Thu).
 const DAY_ORDER: (keyof WorkingHours)[] = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -593,7 +593,7 @@ export default function BookingPage() {
         {errors[key]}
       </p>
     ) : null;
-  const border = (key: keyof Fields) => (errors[key] ? "border-[#a83b2d]/60" : "border-ink/15");
+  const border = (key: keyof Fields) => (errors[key] ? "border-[#a83b2d]/60" : "border-ink/15 dark:border-cream/15");
 
   const patientsAhead = liveQueue?.patients_ahead ?? confirmation?.patients_ahead ?? 0;
   const estimatedStart = liveQueue?.estimated_arrival_start ?? confirmation?.estimated_arrival_start;
@@ -602,16 +602,16 @@ export default function BookingPage() {
   return (
     <>
       <Navbar minimal />
-      <main className="min-h-screen w-full bg-cream px-6 pb-28 pt-32 md:px-10 md:pt-40 lg:px-14">
+      <main className="min-h-screen w-full bg-cream dark:bg-charcoal px-6 pb-28 pt-32 md:px-10 md:pt-40 lg:px-14">
         <div className="mx-auto max-w-3xl">
-          <p className="mb-6 flex items-center gap-3 text-[0.7rem] font-medium uppercase tracking-[0.32em] text-ink/50">
+          <p className="mb-6 flex items-center gap-3 text-[0.7rem] font-medium uppercase tracking-[0.32em] text-ink/50 dark:text-cream/50">
             <span className="h-px w-8 bg-gold" aria-hidden="true" />
             {t("site.booking.eyebrow")}
           </p>
-          <h1 className="font-serif text-[2.25rem] font-medium leading-[1.05] tracking-[-0.02em] text-ink sm:text-5xl">
-            {t("site.booking.headingPrefix")} <em className="italic text-ink/90">{t("site.booking.headingEmphasis")}</em>
+          <h1 className="font-serif text-[2.25rem] font-medium leading-[1.05] tracking-[-0.02em] text-ink dark:text-cream sm:text-5xl">
+            {t("site.booking.headingPrefix")} <em className="italic text-ink/90 dark:text-cream/90">{t("site.booking.headingEmphasis")}</em>
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink/60">
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink/60 dark:text-cream/60">
             {t("site.booking.description")}
           </p>
 
@@ -630,15 +630,15 @@ export default function BookingPage() {
                       isDone
                         ? "bg-ink text-cream"
                         : isActive
-                        ? "bg-gold text-ink"
-                        : "bg-ink/10 text-ink/40"
+                        ? "bg-gold text-ink dark:text-cream"
+                        : "bg-ink/10 text-ink/40 dark:text-cream/40"
                     }`}
                   >
                     {isDone ? <Check className="h-4 w-4" /> : i + 1}
                   </span>
                   <span
                     className={`hidden text-xs font-medium uppercase tracking-[0.15em] sm:inline ${
-                      isActive ? "text-ink" : "text-ink/40"
+                      isActive ? "text-ink dark:text-cream" : "text-ink/40 dark:text-cream/40"
                     }`}
                   >
                     {s.label}
@@ -649,7 +649,7 @@ export default function BookingPage() {
             })}
           </ol>
 
-          <div className="mt-10 rounded-2xl border border-ink/10 bg-white/70 p-6 shadow-[0_20px_50px_-20px_rgba(16,24,32,0.15)] backdrop-blur-md sm:p-10">
+          <div className="mt-10 rounded-2xl border border-ink/10 dark:border-cream/10 bg-white/70 p-6 shadow-[0_20px_50px_-20px_rgba(16,24,32,0.15)] backdrop-blur-md sm:p-10">
             {/* ── STEP 0: BRANCH ───────────────────────────────────────────── */}
             {step === "branch" && (
               <div className="space-y-6">
@@ -669,21 +669,21 @@ export default function BookingPage() {
                         className={`rounded-xl border p-5 text-left transition-all ${
                           fields.branchId === String(b.id)
                             ? "border-gold bg-gold/10 ring-2 ring-gold/25"
-                            : "border-ink/15 bg-white/50 hover:border-ink/30"
+                            : "border-ink/15 dark:border-cream/15 bg-white/50 hover:border-ink/30 dark:border-cream/30"
                         }`}
                       >
                         <span className="flex items-center gap-2">
                           <span
                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                              fields.branchId === String(b.id) ? "border-gold" : "border-ink/30"
+                              fields.branchId === String(b.id) ? "border-gold" : "border-ink/30 dark:border-cream/30"
                             }`}
                           >
                             {fields.branchId === String(b.id) && <span className="h-2 w-2 rounded-full bg-gold" />}
                           </span>
-                          <span className="font-serif text-base font-medium text-ink">{b.name}</span>
+                          <span className="font-serif text-base font-medium text-ink dark:text-cream">{b.name}</span>
                         </span>
-                        {b.address && <span className="mt-2 block text-xs leading-relaxed text-ink/55">{b.address}</span>}
-                        <span className="mt-3 flex flex-col gap-1 border-t border-ink/10 pt-3 text-[0.7rem] text-ink/55">
+                        {b.address && <span className="mt-2 block text-xs leading-relaxed text-ink/55 dark:text-cream/55">{b.address}</span>}
+                        <span className="mt-3 flex flex-col gap-1 border-t border-ink/10 dark:border-cream/10 pt-3 text-[0.7rem] text-ink/55 dark:text-cream/55">
                           {formatBranchHours(b.working_hours, t, locale).map((line) => (
                             <span key={line} className="flex items-center gap-1.5">
                               <Clock className="h-3 w-3 shrink-0 text-gold" />
@@ -723,7 +723,7 @@ export default function BookingPage() {
                     max={maxDate}
                     value={date}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    className={`${inputBase} border-ink/15 ${date ? "text-ink" : "text-ink/45"}`}
+                    className={`${inputBase} border-ink/15 dark:border-cream/15 ${date ? "text-ink dark:text-cream" : "text-ink/45 dark:text-cream/45"}`}
                   />
                   {dateError && (
                     <p role="alert" className="mt-2 text-xs text-[#a83b2d]">
@@ -733,26 +733,26 @@ export default function BookingPage() {
                 </div>
 
                 {checkingAvailability && (
-                  <div className="flex items-center gap-2 text-sm text-ink/50">
+                  <div className="flex items-center gap-2 text-sm text-ink/50 dark:text-cream/50">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t("site.booking.checkingAvailability")}
                   </div>
                 )}
 
                 {availability && !dateError && (
-                  <div className="rounded-xl border border-ink/10 bg-cream/60 p-5">
-                    <p className="font-serif text-lg font-medium text-ink">{formatDateLong(date, locale)}</p>
+                  <div className="rounded-xl border border-ink/10 dark:border-cream/10 bg-cream/60 dark:bg-charcoal-raised/60 p-5">
+                    <p className="font-serif text-lg font-medium text-ink dark:text-cream">{formatDateLong(date, locale)}</p>
                     <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wider text-ink/40">
+                        <span className="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">
                           <Users className="h-3.5 w-3.5" /> {t("site.booking.patientsBooked")}
                         </span>
-                        <span className="mt-1 block font-serif text-2xl font-medium text-ink">
+                        <span className="mt-1 block font-serif text-2xl font-medium text-ink dark:text-cream">
                           {availability.patients_booked}
                         </span>
                       </div>
                       <div>
-                        <span className="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wider text-ink/40">
+                        <span className="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">
                           <ShieldCheck className="h-3.5 w-3.5" /> {t("site.booking.yourQueueWillBe")}
                         </span>
                         <span className="mt-1 block font-serif text-2xl font-medium text-gold">
@@ -760,7 +760,7 @@ export default function BookingPage() {
                         </span>
                       </div>
                     </div>
-                    <p className="mt-4 flex items-start gap-1.5 text-xs text-ink/50">
+                    <p className="mt-4 flex items-start gap-1.5 text-xs text-ink/50 dark:text-cream/50">
                       <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       {t("site.booking.openHours", {
                         opens: availability.opens ? formatHourMinute(availability.opens, locale) : "",
@@ -775,7 +775,7 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={() => setStep("branch")}
-                      className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                      className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream"
                     >
                       <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
                     </button>
@@ -844,20 +844,20 @@ export default function BookingPage() {
                     id="treatment"
                     value={fields.treatment}
                     onChange={set("treatment")}
-                    className={`${inputBase} ${border("treatment")} ${fields.treatment ? "text-ink" : "text-ink/35"}`}
+                    className={`${inputBase} ${border("treatment")} ${fields.treatment ? "text-ink dark:text-cream" : "text-ink/35 dark:text-cream/35"}`}
                   >
                     <option value="" disabled>
                       {t("site.booking.selectService")}
                     </option>
                     {SERVICE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt} className="text-ink">
+                      <option key={opt} value={opt} className="text-ink dark:text-cream">
                         {treatmentLabel(opt)}
                       </option>
                     ))}
                   </select>
                   {err("treatment")}
                   {fields.treatment === CONSULTATION_SERVICE && (
-                    <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-ink/70">
+                    <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-ink/70 dark:text-cream/70">
                       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
                       <span>
                         {t("site.booking.consultationNotice", {
@@ -866,7 +866,7 @@ export default function BookingPage() {
                           i < arr.length - 1 ? (
                             <span key={i}>
                               {part}
-                              <strong className="font-medium text-ink">{t("site.booking.consultationWord")}</strong>
+                              <strong className="font-medium text-ink dark:text-cream">{t("site.booking.consultationWord")}</strong>
                             </span>
                           ) : (
                             <span key={i}>{part}</span>
@@ -881,16 +881,16 @@ export default function BookingPage() {
                   <div className="rounded-xl border border-gold/30 bg-gold/10 p-4 space-y-1.5">
                     {fields.treatment !== CONSULTATION_SERVICE && selectedBranch.consultation_fee != null && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-ink/60">{t("site.booking.consultationFeeLabel")}</span>
-                        <span className="font-serif font-medium text-ink">
+                        <span className="text-ink/60 dark:text-cream/60">{t("site.booking.consultationFeeLabel")}</span>
+                        <span className="font-serif font-medium text-ink dark:text-cream">
                           {selectedBranch.consultation_fee.toLocaleString("en-US")} {schedule?.currency ?? "EGP"}
                         </span>
                       </div>
                     )}
                     {fields.treatment === CONSULTATION_SERVICE && selectedBranch.consultation_price != null && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-ink/60">{t("site.booking.consultationPriceLabel")}</span>
-                        <span className="font-serif font-medium text-ink">
+                        <span className="text-ink/60 dark:text-cream/60">{t("site.booking.consultationPriceLabel")}</span>
+                        <span className="font-serif font-medium text-ink dark:text-cream">
                           {selectedBranch.consultation_price.toLocaleString("en-US")} {schedule?.currency ?? "EGP"}
                         </span>
                       </div>
@@ -900,14 +900,14 @@ export default function BookingPage() {
 
                 <div>
                   <label htmlFor="message" className={labelBase}>
-                    {t("site.booking.message")} <span className="text-ink/35">{t("site.booking.optional")}</span>
+                    {t("site.booking.message")} <span className="text-ink/35 dark:text-cream/35">{t("site.booking.optional")}</span>
                   </label>
                   <textarea
                     id="message"
                     rows={3}
                     value={fields.message}
                     onChange={set("message")}
-                    className={`${inputBase} resize-none border-ink/15`}
+                    className={`${inputBase} resize-none border-ink/15 dark:border-cream/15`}
                     placeholder={t("site.booking.messagePlaceholder")}
                   />
                 </div>
@@ -916,7 +916,7 @@ export default function BookingPage() {
                   <button
                     type="button"
                     onClick={() => setStep("date")}
-                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream"
                   >
                     <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
                   </button>
@@ -937,48 +937,48 @@ export default function BookingPage() {
                 <div className="flex items-start gap-3 rounded-xl border border-gold/40 bg-gold/10 p-4">
                   <Info className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
                   <div>
-                    <h2 className="font-serif text-xl font-medium text-ink">{t("site.booking.existingTitle")}</h2>
-                    <p className="mt-1 text-sm leading-relaxed text-ink/60">{t("site.booking.existingSubtitle")}</p>
+                    <h2 className="font-serif text-xl font-medium text-ink dark:text-cream">{t("site.booking.existingTitle")}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-ink/60 dark:text-cream/60">{t("site.booking.existingSubtitle")}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-ink/10 dark:border-cream/10 bg-cream/60 dark:bg-charcoal-raised/60 p-5 sm:grid-cols-3">
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.existingName")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{activeBooking.full_name}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.existingName")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{activeBooking.full_name}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.service2")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{treatmentLabel(activeBooking.treatment)}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.service2")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{treatmentLabel(activeBooking.treatment)}</span>
                   </div>
                   {activeBooking.branch_name && (
                     <div>
-                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.branchLabel")}</span>
-                      <span className="font-serif text-base font-medium text-ink">{activeBooking.branch_name}</span>
+                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.branchLabel")}</span>
+                      <span className="font-serif text-base font-medium text-ink dark:text-cream">{activeBooking.branch_name}</span>
                     </div>
                   )}
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.date")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{formatDateLong(activeBooking.date, locale)}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.date")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{formatDateLong(activeBooking.date, locale)}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.queueNumber")}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.queueNumber")}</span>
                     <span className="font-serif text-base font-medium text-gold">#{activeBooking.queue_number}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.estimatedArrival")}</span>
-                    <span className="font-serif text-base font-medium text-ink">
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.estimatedArrival")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">
                       {formatTimeRange(activeBooking.estimated_arrival_start, activeBooking.estimated_arrival_end, t("site.booking.toBeConfirmed"))}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.payment")}</span>
-                    <span className="font-serif text-base font-medium text-ink">
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.payment")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">
                       {activeBooking.payment_method === "online" ? t("site.booking.paidOnline") : t("site.booking.payAtClinic")}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.paymentStatus")}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.paymentStatus")}</span>
                     <span
                       className={`inline-block mt-0.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         activeBooking.payment_status === "paid" ? "bg-emerald-500/15 text-emerald-800" : "bg-amber-500/15 text-amber-800"
@@ -1005,7 +1005,7 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={() => setExistingMode("changeDate")}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-ink/15 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:border-ink/30 hover:text-ink"
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-4 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:border-ink/30 dark:border-cream/30 hover:text-ink dark:text-cream"
                     >
                       <CalendarIcon className="h-4 w-4" /> {t("site.booking.changeDate")}
                     </button>
@@ -1020,7 +1020,7 @@ export default function BookingPage() {
                 )}
 
                 {existingMode === "changeDate" && (
-                  <div className="space-y-4 rounded-xl border border-ink/10 bg-white/60 p-5">
+                  <div className="space-y-4 rounded-xl border border-ink/10 dark:border-cream/10 bg-white/60 p-5">
                     <div>
                       <label htmlFor="reschedule-date" className={labelBase}>
                         {t("site.booking.pickNewDate")} <span className="text-gold">*</span>
@@ -1032,19 +1032,19 @@ export default function BookingPage() {
                         max={maxDate}
                         value={newDate}
                         onChange={(e) => handleNewDateChange(e.target.value)}
-                        className={`${inputBase} border-ink/15 ${newDate ? "text-ink" : "text-ink/45"}`}
+                        className={`${inputBase} border-ink/15 dark:border-cream/15 ${newDate ? "text-ink dark:text-cream" : "text-ink/45 dark:text-cream/45"}`}
                       />
                       {newDateError && <p role="alert" className="mt-2 text-xs text-[#a83b2d]">{newDateError}</p>}
                     </div>
                     {checkingNewDate && (
-                      <div className="flex items-center gap-2 text-sm text-ink/50">
+                      <div className="flex items-center gap-2 text-sm text-ink/50 dark:text-cream/50">
                         <Loader2 className="h-4 w-4 animate-spin" /> {t("site.booking.checkingAvailability")}
                       </div>
                     )}
                     {newDateAvail && !newDateError && (
-                      <div className="rounded-xl border border-ink/10 bg-cream/60 p-4">
-                        <p className="font-serif text-base font-medium text-ink">{formatDateLong(newDate, locale)}</p>
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/60">
+                      <div className="rounded-xl border border-ink/10 dark:border-cream/10 bg-cream/60 dark:bg-charcoal-raised/60 p-4">
+                        <p className="font-serif text-base font-medium text-ink dark:text-cream">{formatDateLong(newDate, locale)}</p>
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/60 dark:text-cream/60">
                           <Users className="h-3.5 w-3.5" /> {t("site.booking.yourQueueWillBe")}{" "}
                           <span className="font-medium text-gold">#{newDateAvail.next_queue_number}</span>
                         </p>
@@ -1059,7 +1059,7 @@ export default function BookingPage() {
                           setNewDateAvail(null);
                           setNewDateError("");
                         }}
-                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream"
                       >
                         <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
                       </button>
@@ -1095,7 +1095,7 @@ export default function BookingPage() {
                       <button
                         type="button"
                         onClick={() => setExistingMode("actions")}
-                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                        className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream"
                       >
                         {t("site.booking.keepInstead")}
                       </button>
@@ -1125,15 +1125,15 @@ export default function BookingPage() {
                 {amountToPay > 0 && (
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-gold/30 bg-gold/10 p-5">
                     <div>
-                      <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-ink/50">
+                      <p className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-ink/50 dark:text-cream/50">
                         {t("site.booking.amountToPay")}
                       </p>
-                      <p className="mt-1 font-serif text-3xl font-medium text-ink">
+                      <p className="mt-1 font-serif text-3xl font-medium text-ink dark:text-cream">
                         {amountToPay.toLocaleString("en-US")}{" "}
-                        <span className="text-lg text-ink/60">{schedule?.currency ?? "EGP"}</span>
+                        <span className="text-lg text-ink/60 dark:text-cream/60">{schedule?.currency ?? "EGP"}</span>
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-ink/5 px-3 py-1 text-[0.65rem] font-medium text-ink/60">
+                    <span className="shrink-0 rounded-full bg-ink/5 px-3 py-1 text-[0.65rem] font-medium text-ink/60 dark:text-cream/60">
                       {fields.treatment === CONSULTATION_SERVICE
                         ? t("site.booking.consultationPriceLabel")
                         : t("site.booking.consultationFeeLabel")}
@@ -1160,28 +1160,28 @@ export default function BookingPage() {
                         onClick={() => { if (!opt.disabled) setPaymentMethod(opt.id); }}
                         className={`rounded-xl border p-5 text-left transition-all ${
                           opt.disabled
-                            ? "cursor-not-allowed border-ink/10 bg-ink/[0.03] opacity-60"
+                            ? "cursor-not-allowed border-ink/10 dark:border-cream/10 bg-ink/[0.03] opacity-60"
                             : selected
                             ? "border-gold bg-gold/10 ring-2 ring-gold/25"
-                            : "border-ink/15 bg-white/50 hover:border-ink/30"
+                            : "border-ink/15 dark:border-cream/15 bg-white/50 hover:border-ink/30 dark:border-cream/30"
                         }`}
                       >
                         <span className="flex items-center gap-2">
                           <span
                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                              selected ? "border-gold" : "border-ink/30"
+                              selected ? "border-gold" : "border-ink/30 dark:border-cream/30"
                             }`}
                           >
                             {selected && <span className="h-2 w-2 rounded-full bg-gold" />}
                           </span>
-                          <span className="font-serif text-base font-medium text-ink">{opt.title}</span>
+                          <span className="font-serif text-base font-medium text-ink dark:text-cream">{opt.title}</span>
                           {opt.disabled && (
-                            <span className="ms-auto rounded-full bg-ink/10 px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-ink/50">
+                            <span className="ms-auto rounded-full bg-ink/10 px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-ink/50 dark:text-cream/50">
                               {t("site.booking.comingSoon")}
                             </span>
                           )}
                         </span>
-                        <span className="mt-2 block text-xs leading-relaxed text-ink/55">{opt.desc}</span>
+                        <span className="mt-2 block text-xs leading-relaxed text-ink/55 dark:text-cream/55">{opt.desc}</span>
                       </button>
                       );
                     })}
@@ -1198,7 +1198,7 @@ export default function BookingPage() {
                   <button
                     type="button"
                     onClick={() => setStep("details")}
-                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink"
+                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream"
                   >
                     <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
                   </button>
@@ -1231,14 +1231,14 @@ export default function BookingPage() {
                   {t("site.booking.demoGatewayBody")}
                 </div>
 
-                <div className="rounded-xl border border-ink/10 bg-cream/60 p-5">
-                  <p className="text-[0.65rem] uppercase tracking-wider text-ink/40">{t("site.booking.amountDue")}</p>
-                  <p className="font-serif text-3xl font-medium text-ink">
+                <div className="rounded-xl border border-ink/10 dark:border-cream/10 bg-cream/60 dark:bg-charcoal-raised/60 p-5">
+                  <p className="text-[0.65rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.amountDue")}</p>
+                  <p className="font-serif text-3xl font-medium text-ink dark:text-cream">
                     {confirmation.consultation_fee && confirmation.consultation_fee > 0
                       ? `${confirmation.consultation_fee.toLocaleString("en-US")} ${schedule?.currency ?? "EGP"}`
                       : t("site.booking.consultationFee")}
                   </p>
-                  <p className="mt-1 text-xs text-ink/50">
+                  <p className="mt-1 text-xs text-ink/50 dark:text-cream/50">
                     {t("site.booking.bookingQueueRef", { id: confirmation.id, number: confirmation.queue_number })}
                   </p>
                 </div>
@@ -1254,7 +1254,7 @@ export default function BookingPage() {
                     type="button"
                     onClick={() => setStep("payment")}
                     disabled={payingOnline}
-                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:text-ink disabled:opacity-40"
+                    className="inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:text-ink dark:text-cream disabled:opacity-40"
                   >
                     <ArrowLeft className="h-4 w-4" /> {t("site.booking.back")}
                   </button>
@@ -1282,65 +1282,65 @@ export default function BookingPage() {
             {/* ── STEP 4: CONFIRMATION ────────────────────────────────────────── */}
             {step === "confirmed" && confirmation && (
               <div ref={successRef} tabIndex={-1} className="outline-none">
-                <span className="grid h-14 w-14 place-items-center rounded-full bg-gold text-ink shadow-md">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-gold text-ink dark:text-cream shadow-md">
                   <Check className="h-7 w-7" strokeWidth={2.5} />
                 </span>
-                <h2 className="mt-6 font-serif text-3xl font-medium tracking-tight text-ink sm:text-4xl">
+                <h2 className="mt-6 font-serif text-3xl font-medium tracking-tight text-ink dark:text-cream sm:text-4xl">
                   {t("site.booking.bookingConfirmed")}
                 </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink/60">
+                <p className="mt-2 text-sm leading-relaxed text-ink/60 dark:text-cream/60">
                   {t("site.booking.thankYou", { name: fields.fullName })}
                 </p>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-ink/10 bg-cream/60 p-5 sm:grid-cols-3">
+                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-ink/10 dark:border-cream/10 bg-cream/60 dark:bg-charcoal-raised/60 p-5 sm:grid-cols-3">
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.date")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{formatDateLong(confirmation.date, locale)}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.date")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{formatDateLong(confirmation.date, locale)}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.service2")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{treatmentLabel(confirmation.treatment)}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.service2")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{treatmentLabel(confirmation.treatment)}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.queueNumber")}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.queueNumber")}</span>
                     <span className="font-serif text-base font-medium text-gold">#{confirmation.queue_number}</span>
                   </div>
                   {confirmation.consultation_fee != null && confirmation.consultation_fee > 0 && (
                     <div>
-                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">
+                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">
                         {confirmation.service_type === "consultation"
                           ? t("site.booking.consultationPriceLabel")
                           : t("site.booking.consultationFeeLabel")}
                       </span>
-                      <span className="font-serif text-base font-medium text-ink">
+                      <span className="font-serif text-base font-medium text-ink dark:text-cream">
                         {confirmation.consultation_fee.toLocaleString("en-US")} {schedule?.currency ?? "EGP"}
                       </span>
                     </div>
                   )}
                   {confirmation.branch_name && (
                     <div>
-                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.branchLabel")}</span>
-                      <span className="font-serif text-base font-medium text-ink">{confirmation.branch_name}</span>
+                      <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.branchLabel")}</span>
+                      <span className="font-serif text-base font-medium text-ink dark:text-cream">{confirmation.branch_name}</span>
                     </div>
                   )}
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.patientsAhead")}</span>
-                    <span className="font-serif text-base font-medium text-ink">{patientsAhead}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.patientsAhead")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">{patientsAhead}</span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.estimatedArrival")}</span>
-                    <span className="font-serif text-base font-medium text-ink">
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.estimatedArrival")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">
                       {formatTimeRange(estimatedStart, estimatedEnd, t("site.booking.toBeConfirmed"))}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.payment")}</span>
-                    <span className="font-serif text-base font-medium text-ink">
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.payment")}</span>
+                    <span className="font-serif text-base font-medium text-ink dark:text-cream">
                       {confirmation.payment_method === "online" ? t("site.booking.paidOnline") : t("site.booking.payAtClinic")}
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.paymentStatus")}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.paymentStatus")}</span>
                     <span
                       className={`inline-block mt-0.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         confirmation.payment_status === "paid"
@@ -1352,12 +1352,12 @@ export default function BookingPage() {
                     </span>
                   </div>
                   <div>
-                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40">{t("site.booking.status")}</span>
-                    <span className="font-serif text-base font-medium capitalize text-ink">{statusLabel(confirmation.status)}</span>
+                    <span className="block text-[0.62rem] uppercase tracking-wider text-ink/40 dark:text-cream/40">{t("site.booking.status")}</span>
+                    <span className="font-serif text-base font-medium capitalize text-ink dark:text-cream">{statusLabel(confirmation.status)}</span>
                   </div>
                 </div>
 
-                <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-ink/50">
+                <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-ink/50 dark:text-cream/50">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
                   {t("site.booking.arrivalDisclaimer")}
                 </p>
@@ -1366,13 +1366,13 @@ export default function BookingPage() {
                   <button
                     type="button"
                     onClick={resetFlow}
-                    className="text-xs font-medium uppercase tracking-[0.2em] text-ink underline-offset-4 hover:underline"
+                    className="text-xs font-medium uppercase tracking-[0.2em] text-ink dark:text-cream underline-offset-4 hover:underline"
                   >
                     {t("site.booking.bookAnother")}
                   </button>
                   <Link
                     href="/"
-                    className="text-xs font-medium uppercase tracking-[0.2em] text-ink/50 underline-offset-4 hover:text-ink hover:underline"
+                    className="text-xs font-medium uppercase tracking-[0.2em] text-ink/50 dark:text-cream/50 underline-offset-4 hover:text-ink dark:text-cream hover:underline"
                   >
                     {t("site.booking.returnHome")}
                   </Link>
@@ -1382,7 +1382,7 @@ export default function BookingPage() {
           </div>
 
           {step === "date" && (
-            <p className="mt-6 flex items-center gap-2 text-xs text-ink/40">
+            <p className="mt-6 flex items-center gap-2 text-xs text-ink/40 dark:text-cream/40">
               <CalendarIcon className="h-3.5 w-3.5" />
               {t("site.booking.workingDaysNote", {
                 window: schedule ? t("site.booking.bookingWindowSuffix", { days: schedule.booking_window_days }) : "",
@@ -1393,14 +1393,14 @@ export default function BookingPage() {
           {/* Single exit out of the focused booking flow. Hidden once the
               booking is confirmed — at that point leaving cancels nothing. */}
           {step !== "confirmed" && (
-            <div className="mt-10 border-t border-ink/10 pt-6">
+            <div className="mt-10 border-t border-ink/10 dark:border-cream/10 pt-6">
               <p className="flex items-start gap-2 text-xs leading-relaxed text-[#a83b2d]">
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {t("site.booking.cancelWarning")}
               </p>
               <Link
                 href="/"
-                className="mt-4 inline-flex items-center gap-2 rounded-full border border-ink/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 transition-colors hover:border-ink/30 hover:text-ink"
+                className="mt-4 inline-flex items-center gap-2 rounded-full border border-ink/15 dark:border-cream/15 px-6 py-3.5 text-xs font-medium uppercase tracking-[0.2em] text-ink/70 dark:text-cream/70 transition-colors hover:border-ink/30 dark:border-cream/30 hover:text-ink dark:text-cream"
               >
                 <ArrowLeft className="h-4 w-4" /> {t("site.booking.backToHome")}
               </Link>

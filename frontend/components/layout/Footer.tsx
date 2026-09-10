@@ -20,9 +20,16 @@ export function Footer() {
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:gap-16">
           {/* Brand */}
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.28em] text-cream">
-              Lumina <span className="text-gold">Dental</span>
-            </p>
+            <div className="flex items-center gap-2.5 text-sm font-medium uppercase tracking-[0.28em] text-cream">
+              <img
+                src="/images/elan-mark-light.png"
+                alt="Èlan Studio"
+                className="h-6 w-auto object-contain"
+              />
+              <span>
+                Èlan <span className="text-gold">Studio</span>
+              </span>
+            </div>
             <p className="mt-5 max-w-xs font-serif text-2xl font-medium leading-tight tracking-tight text-cream/80">
               {t("site.footer.tagline")}
             </p>

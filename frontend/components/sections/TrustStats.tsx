@@ -47,7 +47,10 @@ export function TrustStats() {
                 i > 0 ? "lg:border-l lg:border-cream/10" : ""
               }`}
             >
-              <dd className="flex items-baseline font-serif text-5xl font-medium leading-none tracking-tight text-cream md:text-6xl lg:text-7xl">
+              <dd
+                dir="ltr"
+                className="flex items-baseline font-serif text-5xl font-medium leading-none tracking-tight text-cream md:text-6xl lg:text-7xl"
+              >
                 <CountUp value={stat.value} decimals={stat.decimals} />
                 <span className="text-gold">{stat.suffix}</span>
               </dd>

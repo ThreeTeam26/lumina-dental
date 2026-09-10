@@ -1,10 +1,10 @@
 /* ==========================================================================
-   LUMINA DENTAL — Shared constants
+   ÈLAN STUDIO — Shared constants
    ========================================================================== */
 
 export const SITE = {
-  name: "Lumina Dental",
-  title: "Lumina Dental | Modern Dentistry",
+  name: "Èlan Studio",
+  title: "Èlan Studio | Modern Dentistry",
   description:
     "Modern, personalized dental care designed around your comfort and confidence.",
 } as const;
@@ -18,8 +18,10 @@ export const COLORS = {
   ink: "#101820",
   white: "#FFFFFF",
   beige: "#E8E2D8",
-  gold: "#B99A6B",
+  gold: "#C4A474",
   muted: "#6B7280",
+  charcoal: "#080D1C",
+  charcoalRaised: "#0F1630",
 } as const;
 
 /**
@@ -179,7 +181,7 @@ export const TESTIMONIALS = [
 
 /** Clinic contact details (demo). */
 export const CLINIC = {
-  name: "Lumina Dental",
+  name: "Èlan Studio",
   address: "New Cairo, Egypt",
   hours: [
     { days: "Saturday – Thursday", time: "10:00 AM – 9:00 PM" },
@@ -187,7 +189,7 @@ export const CLINIC = {
   ],
   phone: "+20 100 000 0000",
   phoneHref: "tel:+201000000000",
-  email: "hello@luminadental.com",
+  email: "hello@elanstudio.com",
   whatsapp: "https://wa.me/201000000000",
   directions:
     "https://www.google.com/maps/search/?api=1&query=New+Cairo+Egypt",

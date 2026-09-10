@@ -21,7 +21,7 @@ const PREVIEW_W = 300;
 const PREVIEW_H = 208;
 
 export function Treatments() {
-  const { t } = useLanguage();
+  const { t, dir } = useLanguage();
   // TREATMENTS carries the numbers/preview-image order (locale-agnostic);
   // titles/descriptions come from the dictionary, indexed positionally.
   const localizedTreatments = TREATMENTS.map((tr, i) => ({
@@ -76,7 +76,11 @@ export function Treatments() {
   const handleMove = (e: React.MouseEvent) => {
     if (!enabled.current || !listRef.current) return;
     const rect = listRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left + 24;
+    // In RTL, row text is right-aligned, so the preview should trail the
+    // cursor toward the left instead of the right — otherwise it lands
+    // straight on top of the title it's meant to illustrate.
+    const offset = dir === "rtl" ? -(PREVIEW_W + 24) : 24;
+    const x = e.clientX - rect.left + offset;
     const y = e.clientY - rect.top - PREVIEW_H / 2;
     const cx = Math.min(Math.max(x, 0), rect.width - PREVIEW_W);
     const cy = Math.min(Math.max(y, 0), rect.height - PREVIEW_H);
@@ -175,7 +179,7 @@ export function Treatments() {
                 onMouseEnter={() => handleRowEnter(i)}
                 onClick={() => setOpen(open === i ? null : i)}
                 aria-expanded={open === i}
-                className="relative flex w-full items-center gap-4 py-7 text-left transition-colors duration-500 md:gap-8 md:py-9 lg:group-hover:bg-beige/40"
+                className="relative flex w-full items-center gap-4 py-7 text-left rtl:text-right transition-colors duration-500 md:gap-8 md:py-9 lg:group-hover:bg-beige/40"
               >
                 <span className="w-8 shrink-0 text-xs font-medium tabular-nums tracking-widest text-ink/40 transition-colors duration-300 group-hover:text-gold md:w-12">
                   {tr.number}

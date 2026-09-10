@@ -1203,8 +1203,8 @@ export default function AdminPage() {
 
           {/* Header Monogram */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-[#101820] text-[#b99a6b] flex items-center justify-center font-serif text-2xl font-bold shadow-md mb-4">
-              LD
+            <div className="h-16 w-16 rounded-2xl bg-[#101820] flex items-center justify-center p-3 shadow-md mb-4">
+              <img src="/images/elan-mark-light.png" alt="Èlan Studio" className="h-full w-auto object-contain" />
             </div>
             <h1 className="font-serif text-2xl font-medium tracking-tight text-[#101820]">
               {t("admin.login.portalTitle")}
@@ -1286,8 +1286,8 @@ export default function AdminPage() {
       <header className="sticky top-0 z-30 bg-[#f4f1eb]/90 backdrop-blur-md border-b border-[#101820]/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#101820] text-[#b99a6b] flex items-center justify-center font-serif font-bold text-lg shadow-sm">
-              LD
+            <div className="h-10 w-10 rounded-xl bg-[#101820] flex items-center justify-center p-2 shadow-sm">
+              <img src="/images/elan-mark-light.png" alt="Èlan Studio" className="h-full w-auto object-contain" />
             </div>
             <div>
               <h1 className="font-serif text-lg font-medium leading-tight text-[#101820]">

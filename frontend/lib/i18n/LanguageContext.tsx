@@ -37,11 +37,10 @@ function interpolate(raw: string, vars?: Record<string, string | number>): strin
 }
 
 /**
- * Two independent instances of this exist: app/admin/layout.tsx (RTL-capable,
- * its own storage key) and app/(site)/layout.tsx (LTR-only — the marketing
- * site's GSAP scroll choreography and 3D hero aren't safe to mirror, so
- * Arabic there is translated text only). /booking renders Navbar/Footer
- * directly with neither provider mounted — see useLanguage()'s fallback.
+ * Two independent instances of this exist: app/admin/layout.tsx and
+ * app/(site)/layout.tsx (both RTL-capable, each with its own storage key).
+ * /booking renders Navbar/Footer directly with neither provider mounted —
+ * see useLanguage()'s fallback.
  */
 export function LanguageProvider({
   children,

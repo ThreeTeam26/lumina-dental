@@ -4,7 +4,7 @@ export const translations = {
   en: {
     admin: {
       login: {
-        portalTitle: "Lumina Dental Portal",
+        portalTitle: "Èlan Studio Portal",
         portalSubtitle: "Clinic Management & Day Schedule",
         username: "Username",
         password: "Password",
@@ -14,7 +14,7 @@ export const translations = {
         sessionExpired: "Your session has expired — please sign in again. Your data is safe.",
       },
       header: {
-        clinicName: "Lumina Dental Clinic",
+        clinicName: "Èlan Studio",
         clinicSubtitle: "Clinic Administration & Schedule",
         yourBranch: "Branch: {name}",
         branchFilter: "Filter by branch",
@@ -286,7 +286,7 @@ export const translations = {
         saveEntryFirst: "Save this visit first to attach images.",
         downloadPdf: "Download PDF",
         pdfTitle: "Medical Record",
-        pdfClinic: "Lumina Dental",
+        pdfClinic: "Èlan Studio",
         pdfImages: "Images",
         pdfGenerated: "Generated",
         pdfPopupBlocked: "Please allow pop-ups for this site to download the PDF.",
@@ -462,7 +462,7 @@ export const translations = {
         clinic: "Clinic",
         bookAppointment: "Book Appointment",
         bookShort: "Book",
-        brandAria: "Lumina Dental, home",
+        brandAria: "Èlan Studio, home",
         openMenuAria: "Open menu",
         closeMenuAria: "Close menu",
       },
@@ -487,7 +487,7 @@ export const translations = {
         contact: "Contact",
         visit: "Visit",
         follow: "Follow",
-        rights: "© 2026 Lumina Dental. All rights reserved.",
+        rights: "© 2026 Èlan Studio. All rights reserved.",
         demoNotice: "Demo project, not a real clinic.",
       },
       brandStatement: {
@@ -558,7 +558,7 @@ export const translations = {
         disclaimer: "Demo profile for presentation, not a real practitioner.",
       },
       whyChooseUs: {
-        eyebrow: "Why Lumina",
+        eyebrow: "Why Èlan Studio",
         headingLine1: "Care that goes",
         headingLine2: "beyond the chair",
         p1Title: "Experience",
@@ -573,7 +573,7 @@ export const translations = {
       clinicExperience: {
         eyebrow: "The Experience",
         headingPrefix: "Step inside",
-        headingSuffix: "Lumina",
+        headingSuffix: "Èlan Studio",
         swipeHint: "Swipe to explore →",
         scrollHint: "Scroll to explore →",
         prevImage: "Previous image",
@@ -789,7 +789,7 @@ export const translations = {
   ar: {
     admin: {
       login: {
-        portalTitle: "بوابة لومينا دنتال",
+        portalTitle: "بوابة إيلان ستوديو",
         portalSubtitle: "إدارة العيادة وجدول اليوم",
         username: "اسم المستخدم",
         password: "كلمة المرور",
@@ -799,7 +799,7 @@ export const translations = {
         sessionExpired: "الجلسة خلصت — سجل دخول تاني. بياناتك محفوظة ومفيش حاجة اتأثرت.",
       },
       header: {
-        clinicName: "عيادة لومينا دنتال",
+        clinicName: "إيلان ستوديو",
         clinicSubtitle: "إدارة العيادة والجدول",
         yourBranch: "الفرع: {name}",
         branchFilter: "فلترة حسب الفرع",
@@ -1071,7 +1071,7 @@ export const translations = {
         saveEntryFirst: "احفظ الزيارة الأول علشان ترفع صور.",
         downloadPdf: "تحميل PDF",
         pdfTitle: "السجل الطبي",
-        pdfClinic: "عيادة لومينا دنتال",
+        pdfClinic: "إيلان ستوديو",
         pdfImages: "الصور",
         pdfGenerated: "تم الإنشاء",
         pdfPopupBlocked: "من فضلك اسمح بالنوافذ المنبثقة للموقع علشان تنزّل الـPDF.",
@@ -1247,7 +1247,7 @@ export const translations = {
         clinic: "العيادة",
         bookAppointment: "احجز دلوقتي",
         bookShort: "احجز",
-        brandAria: "لومينا دنتال — الصفحة الرئيسية",
+        brandAria: "إيلان ستوديو — الصفحة الرئيسية",
         openMenuAria: "افتح القائمة",
         closeMenuAria: "قفل القائمة",
       },
@@ -1272,7 +1272,7 @@ export const translations = {
         contact: "تواصل معنا",
         visit: "زورنا",
         follow: "تابعنا",
-        rights: "© 2026 لومينا دنتال. جميع الحقوق محفوظة.",
+        rights: "© 2026 إيلان ستوديو. جميع الحقوق محفوظة.",
         demoNotice: "مشروع تجريبي، ليست عيادة حقيقية.",
       },
       brandStatement: {
@@ -1343,7 +1343,7 @@ export const translations = {
         disclaimer: "بروفايل تجريبي للعرض، ليس طبيب حقيقي.",
       },
       whyChooseUs: {
-        eyebrow: "ليه لومينا",
+        eyebrow: "ليه إيلان ستوديو",
         headingLine1: "عناية بتتعدى",
         headingLine2: "كرسي العلاج",
         p1Title: "الخبرة",
@@ -1358,7 +1358,7 @@ export const translations = {
       clinicExperience: {
         eyebrow: "التجربة",
         headingPrefix: "اتفرج جوه",
-        headingSuffix: "لومينا",
+        headingSuffix: "إيلان ستوديو",
         swipeHint: "اسحب عشان تستكشف ←",
         scrollHint: "اسكرول عشان تستكشف ←",
         prevImage: "الصورة السابقة",

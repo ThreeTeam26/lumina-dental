@@ -193,7 +193,7 @@ export function Hero() {
             ref={trustRef}
             className="pointer-events-none absolute bottom-4 left-2 flex items-center gap-4 rounded-2xl border border-ink/5 bg-white/70 px-5 py-4 shadow-[0_10px_40px_-15px_rgba(16,24,32,0.25)] backdrop-blur-sm sm:bottom-8 sm:left-4 lg:bottom-10"
           >
-            <div className="text-2xl font-medium leading-none text-ink">
+            <div dir="ltr" className="text-2xl font-medium leading-none text-ink">
               4.9<span className="text-base text-ink/40"> {t("site.hero.ratingOutOf")}</span>
             </div>
             <div className="h-8 w-px bg-ink/10" aria-hidden="true" />

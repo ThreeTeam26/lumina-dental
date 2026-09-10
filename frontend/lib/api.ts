@@ -1,5 +1,5 @@
 /**
- * Lumina Dental - Backend API Client
+ * Èlan Studio - Backend API Client
  * Connects to FastAPI backend (http://127.0.0.1:8000) with fallback support.
  */
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦷 Lumina Dental
+# ✨ Èlan Studio
 
 ### A full‑stack dental clinic platform — marketing site, queue‑based booking, and a staff admin dashboard
 
@@ -19,7 +19,7 @@
 
 ## ✨ Overview
 
-Lumina Dental is a two-part project:
+Èlan Studio is a two-part project:
 
 - **`frontend/`** — a Next.js marketing site with an immersive 3D hero, plus a public **queue-based booking flow** and a full **staff/admin dashboard**.
 - **`backend/`** — a FastAPI service that owns every business rule: queue assignment, arrival/working-hours checks, payment state, and auth. The frontend never computes any of this itself — it only displays what the API returns, and falls back to a local demo store if the API is unreachable.
@@ -163,7 +163,7 @@ Both platforms deploy from a GitHub repo — make sure your latest commits are p
    | `SECRET_KEY` | a long random string (**required** — don't ship the default) |
    | `CORS_ORIGINS` | your Vercel URL once you have it, e.g. `https://your-app.vercel.app` |
    | `WHATSAPP_API_URL` / `WHATSAPP_API_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | only if WhatsApp reminders are wired up for this deployment |
-4. Deploy, then copy the generated public URL (Settings → Networking → Generate Domain) — you'll need it for the next step. Check the deploy logs for `🦷 Lumina Dental API starting up …` with no traceback — that confirms `init_db()` connected to Supabase and created the schema successfully.
+4. Deploy, then copy the generated public URL (Settings → Networking → Generate Domain) — you'll need it for the next step. Check the deploy logs for `✨ Èlan Studio API starting up …` with no traceback — that confirms `init_db()` connected to Supabase and created the schema successfully.
 
 ### 4) Frontend → Vercel
 1. On [vercel.com](https://vercel.com), **Add New → Project** → import the same GitHub repo.

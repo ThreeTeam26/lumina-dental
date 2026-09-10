@@ -89,7 +89,10 @@ export function WhyChooseUs() {
             <br />
             <span className="italic text-cream/85">{t("site.whyChooseUs.headingLine2")}</span>
           </h2>
-          <p className="wc-head mt-10 flex items-center gap-3 font-serif text-lg text-cream/50 tabular-nums">
+          <p
+            dir="ltr"
+            className="wc-head mt-10 flex items-center gap-3 font-serif text-lg text-cream/50 tabular-nums"
+          >
             <span className="text-gold">
               {String(counter).padStart(2, "0")}
             </span>

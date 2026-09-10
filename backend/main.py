@@ -1,5 +1,5 @@
 """
-Lumina Dental – FastAPI Entrypoint
+Èlan Studio – FastAPI Entrypoint
 
 Run with:
   uvicorn main:app --reload --port 8000
@@ -29,16 +29,16 @@ logger = logging.getLogger(__name__)
 # ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    logger.info("🦷  Lumina Dental API starting up …")
+    logger.info("✨  Èlan Studio API starting up …")
     init_db()           # create tables if they don't exist
     yield
-    logger.info("🦷  Lumina Dental API shutting down …")
+    logger.info("✨  Èlan Studio API shutting down …")
 
 
 # ── App instance ──────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Lumina Dental API",
-    description="Booking & clinic management backend for the Lumina Dental website.",
+    title="Èlan Studio API",
+    description="Booking & clinic management backend for the Èlan Studio website.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -70,4 +70,4 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 def health_check():
-    return {"status": "ok", "service": "Lumina Dental API"}
+    return {"status": "ok", "service": "Èlan Studio API"}

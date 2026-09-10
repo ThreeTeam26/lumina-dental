@@ -28,10 +28,10 @@ const alexandria = Alexandria({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://luminadental.example.com"),
+  metadataBase: new URL("https://elanstudio.example.com"),
   title: {
-    default: "Lumina Dental | Modern Dentistry",
-    template: "%s | Lumina Dental",
+    default: "Èlan Studio | Modern Dentistry",
+    template: "%s | Èlan Studio",
   },
   description:
     "Modern, personalized dental care designed around your comfort and confidence.",
@@ -40,18 +40,18 @@ export const metadata: Metadata = {
     "modern dentistry",
     "cosmetic dentistry",
     "luxury dental care",
-    "Lumina Dental",
+    "Èlan Studio",
   ],
   openGraph: {
-    title: "Lumina Dental | Modern Dentistry",
+    title: "Èlan Studio | Modern Dentistry",
     description:
       "Modern, personalized dental care designed around your comfort and confidence.",
-    siteName: "Lumina Dental",
+    siteName: "Èlan Studio",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumina Dental | Modern Dentistry",
+    title: "Èlan Studio | Modern Dentistry",
     description:
       "Modern, personalized dental care designed around your comfort and confidence.",
   },
@@ -64,7 +64,7 @@ const jsonLd = {
   name: CLINIC.name,
   description:
     "Modern, personalized dental care designed around your comfort and confidence.",
-  url: "https://luminadental.example.com",
+  url: "https://elanstudio.example.com",
   telephone: CLINIC.phone,
   email: CLINIC.email,
   priceRange: "$$",

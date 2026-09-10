@@ -1,1 +1,1 @@
-# Lumina Dental – Backend root package
+# Èlan Studio – Backend root package

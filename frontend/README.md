@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦷 Lumina Dental
+# ✨ Èlan Studio
 
 ### A premium, one‑page website for a modern luxury dental clinic
 
@@ -17,7 +17,7 @@ Editorial art‑direction · an immersive 3D tooth · a cinematic scroll experie
 
 <br/>
 
-![Lumina Dental — Hero](docs/screenshots/hero.png)
+![Èlan Studio — Hero](docs/screenshots/hero.png)
 
 </div>
 
@@ -25,7 +25,7 @@ Editorial art‑direction · an immersive 3D tooth · a cinematic scroll experie
 
 ## ✨ Overview
 
-**Lumina Dental** is a single‑page, editorial website designed to feel like a high‑end creative agency built it for a luxury dental clinic — not a generic medical template. The centrepiece is a **realistic 3D tooth** rendered in WebGL that reacts to the cursor and choreographs with the scroll, wrapped in a smooth, cinematic page experience.
+**Èlan Studio** is a single‑page, editorial website designed to feel like a high‑end creative agency built it for a luxury dental clinic — not a generic medical template. The centrepiece is a **realistic 3D tooth** rendered in WebGL that reacts to the cursor and choreographs with the scroll, wrapped in a smooth, cinematic page experience.
 
 > ⚠️ **Demo project.** All names, reviews, doctor profile, and imagery are fictional placeholders for presentation purposes — not a real clinic.
 

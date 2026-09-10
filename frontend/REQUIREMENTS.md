@@ -1,4 +1,4 @@
-# 📋 Requirements — Lumina Dental
+# 📋 Requirements — Èlan Studio
 
 Everything you need to install and run this project.
 
