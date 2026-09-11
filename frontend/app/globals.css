@@ -5,6 +5,11 @@
    Premium · Minimal · Editorial · Cinematic
    ========================================================================== */
 
+/* Class-based dark mode (driven by ThemeProvider toggling `dark` on <html>)
+   instead of Tailwind's default media-query strategy — lets the visitor
+   override their system preference and persists the choice. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Brand palette — a plain @theme block emits real :root custom properties
    AND generates the color utilities (bg-cream, text-ink, text-gold, …). */
 @theme {
@@ -12,8 +17,12 @@
   --color-ink: #101820; /* primary dark */
   --color-white: #ffffff;
   --color-beige: #e8e2d8; /* muted beige */
-  --color-gold: #b99a6b; /* accent — use sparingly */
+  --color-gold: #c4a474; /* accent — warm champagne gold */
   --color-muted: #6b7280; /* muted text */
+
+  /* Dark-mode surfaces — deep midnight navy palette */
+  --color-charcoal: #080d1c;
+  --color-charcoal-raised: #0f1630;
 }
 
 /* Fonts — inline so the utilities resolve to the next/font variables.
@@ -26,6 +35,12 @@
 :root {
   --background: var(--color-cream);
   --foreground: var(--color-ink);
+}
+
+/* Public site & booking dark-mode theme override */
+:root.dark {
+  --background: var(--color-charcoal);
+  --foreground: var(--color-cream);
 }
 
 /* Arabic typography — Alexandria for everything (not --font-sans/

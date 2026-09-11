@@ -103,7 +103,7 @@ function isValidEgyptPhone(raw: string): boolean {
 }
 
 const inputBase =
-  "w-full rounded-xl border bg-white/60 px-4 py-3 text-ink dark:text-cream outline-none transition-colors duration-200 placeholder:text-ink/35 dark:text-cream/35 focus:border-gold focus:ring-2 focus:ring-gold/25";
+  "w-full rounded-xl border bg-white/60 dark:bg-charcoal/60 px-4 py-3 text-ink dark:text-cream outline-none transition-colors duration-200 placeholder:text-ink/35 dark:placeholder:text-cream/35 focus:border-gold focus:ring-2 focus:ring-gold/25";
 const labelBase = "mb-2 block text-xs font-medium uppercase tracking-[0.15em] text-ink/60 dark:text-cream/60";
 
 // Saturday-first — matches how the clinic's own week reads (open Sat–Thu).
@@ -649,7 +649,7 @@ export default function BookingPage() {
             })}
           </ol>
 
-          <div className="mt-10 rounded-2xl border border-ink/10 dark:border-cream/10 bg-white/70 p-6 shadow-[0_20px_50px_-20px_rgba(16,24,32,0.15)] backdrop-blur-md sm:p-10">
+          <div className="mt-10 rounded-2xl border border-ink/10 dark:border-cream/10 bg-white/70 dark:bg-charcoal-raised/70 p-6 shadow-[0_20px_50px_-20px_rgba(16,24,32,0.15)] backdrop-blur-md sm:p-10">
             {/* ── STEP 0: BRANCH ───────────────────────────────────────────── */}
             {step === "branch" && (
               <div className="space-y-6">
@@ -669,7 +669,7 @@ export default function BookingPage() {
                         className={`rounded-xl border p-5 text-left transition-all ${
                           fields.branchId === String(b.id)
                             ? "border-gold bg-gold/10 ring-2 ring-gold/25"
-                            : "border-ink/15 dark:border-cream/15 bg-white/50 hover:border-ink/30 dark:border-cream/30"
+                            : "border-ink/15 dark:border-cream/15 bg-white/50 dark:bg-charcoal/50 hover:border-ink/30 dark:hover:border-cream/30"
                         }`}
                       >
                         <span className="flex items-center gap-2">
@@ -1020,7 +1020,7 @@ export default function BookingPage() {
                 )}
 
                 {existingMode === "changeDate" && (
-                  <div className="space-y-4 rounded-xl border border-ink/10 dark:border-cream/10 bg-white/60 p-5">
+                  <div className="space-y-4 rounded-xl border border-ink/10 dark:border-cream/10 bg-white/60 dark:bg-charcoal/60 p-5">
                     <div>
                       <label htmlFor="reschedule-date" className={labelBase}>
                         {t("site.booking.pickNewDate")} <span className="text-gold">*</span>
@@ -1163,7 +1163,7 @@ export default function BookingPage() {
                             ? "cursor-not-allowed border-ink/10 dark:border-cream/10 bg-ink/[0.03] opacity-60"
                             : selected
                             ? "border-gold bg-gold/10 ring-2 ring-gold/25"
-                            : "border-ink/15 dark:border-cream/15 bg-white/50 hover:border-ink/30 dark:border-cream/30"
+                            : "border-ink/15 dark:border-cream/15 bg-white/50 dark:bg-charcoal/50 hover:border-ink/30 dark:hover:border-cream/30"
                         }`}
                       >
                         <span className="flex items-center gap-2">
