@@ -445,17 +445,6 @@ def record_payment(db: Session, booking_id: int, current_user: User) -> Booking:
             status_code=status.HTTP_409_CONFLICT,
             detail="Payment has already been recorded for this visit.",
         )
-    # A visit is paid at the clinic, so it can't be settled before its day has
-    # come — block recording payment on a still-upcoming (future-dated) booking.
-    try:
-        booking_date = date.fromisoformat(booking.date) if booking.date else None
-    except ValueError:
-        booking_date = None
-    if booking_date and booking_date > date.today():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Payment can only be recorded once the booking day has arrived.",
-        )
     booking = crud_set_payment_paid(db, booking_id)
     return _stamp_audit(db, booking, current_user)
 
@@ -553,19 +542,6 @@ def mark_arrival(db: Session, booking_id: int, arrived: bool, current_user: User
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
 
     if arrived:
-        # A list-only consultation isn't tied to a scheduled day, so it can be
-        # marked as attended whenever the patient actually comes. A regular
-        # appointment can still only be checked in on its own booking day.
-        # (No working-hours gate either way — staff check patients in whenever
-        # they walk in, early, late, or after the posted closing time.)
-        if booking.service_type != ServiceType.CONSULTATION:
-            booking_date = _parse_date(booking.date)
-            today = date.today()
-            if booking_date != today:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="A patient can only be marked as entered on the day of their booking.",
-                )
         if booking.status == BookingStatus.CANCELLED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

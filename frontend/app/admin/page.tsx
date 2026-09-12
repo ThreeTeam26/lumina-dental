@@ -73,7 +73,7 @@ const isConsultation = (b: Booking) => b.service_type === "consultation";
  *  registered by staff and never placed in a day's queue, so it has no queue
  *  number (patient-booked consultations always get one). Its date, if any, is
  *  just a note and never puts it back in the daily schedule. */
-const isListOnlyConsultation = (b: Booking) => isConsultation(b) && b.queue_number == null;
+const isListOnlyConsultation = (b: Booking) => isConsultation(b) && !b.date;
 
 /** Month select options, English label with the Arabic name in parens. */
 const MONTH_NAMES = [
@@ -154,26 +154,32 @@ const phonesMatch = (a?: string | null, b?: string | null) => {
 
 /** Render the queue-based arrival window as the appointment "time", or a
  *  neutral placeholder when the backend hasn't computed one. */
-function formatEstimatedTime(b: Booking): string {
+function formatEstimatedTime(b: Booking, locale: "en" | "ar" = "en"): string {
   const fmt = (iso?: string | null) => {
     if (!iso) return null;
     try {
-      return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      const dateLocale = locale === "ar" ? "ar-EG-u-nu-latn" : "en-US";
+      return new Date(iso).toLocaleTimeString(dateLocale, { hour: "numeric", minute: "2-digit" });
     } catch {
       return null;
     }
   };
   const a = fmt(b.estimated_arrival_start);
   const z = fmt(b.estimated_arrival_end);
-  if (!a || !z) return "Queue-based";
+  if (!a || !z) return locale === "ar" ? "حسب الطابور" : "Queue-based";
   return a === z ? a : `${a} – ${z}`;
 }
 
 /** Short, safe formatter for the created-at timestamp. */
-function formatCreatedAt(iso?: string): string {
+function formatCreatedAt(iso?: string, locale: "en" | "ar" = "en"): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString("en-US", {
+    let cleanIso = iso.trim();
+    if (!cleanIso.endsWith("Z") && !cleanIso.includes("+") && !cleanIso.includes("-", 10)) {
+      cleanIso = cleanIso.replace(" ", "T") + "Z";
+    }
+    const dateLocale = locale === "ar" ? "ar-EG-u-nu-latn" : "en-US";
+    return new Date(cleanIso).toLocaleString(dateLocale, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -2397,26 +2403,29 @@ export default function AdminPage() {
                                 <Wallet className="w-4 h-4 shrink-0" />
                               </button>
 
-                              {!isConsultation(b) && (
-                                <button
-                                  onClick={() => handleRegisterConsultation(b)}
-                                  disabled={consultationRegisteringId === b.id || !canRegisterConsultation(b)}
-                                  title={
-                                    b.consultation_registered
-                                      ? t("admin.common.registerConsultation")
-                                      : !canRegisterConsultation(b)
-                                      ? t("admin.common.registerConsultationDisabledTitle")
-                                      : t("admin.common.registerConsultation")
-                                  }
-                                  className={`shrink-0 p-1.5 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                                    b.consultation_registered
-                                      ? "bg-[#b99a6b]/20 border-[#b99a6b]/40 text-[#101820]"
-                                      : "bg-[#f4f1eb] hover:bg-[#b99a6b]/20 border-[#101820]/10 text-[#101820]"
-                                  }`}
-                                >
-                                  <Stethoscope className="w-4 h-4 shrink-0" />
-                                </button>
-                              )}
+                              {!isConsultation(b) && (() => {
+                                const hasConsult = b.consultation_registered || examsWithMatchedConsultation.has(b.id);
+                                return (
+                                  <button
+                                    onClick={() => handleRegisterConsultation(b)}
+                                    disabled={consultationRegisteringId === b.id || (!hasConsult && !canRegisterConsultation(b))}
+                                    title={
+                                      hasConsult
+                                        ? t("admin.common.hasConsultation")
+                                        : !canRegisterConsultation(b)
+                                        ? t("admin.common.registerConsultationDisabledTitle")
+                                        : t("admin.common.registerConsultation")
+                                    }
+                                    className={`shrink-0 p-1.5 rounded-lg border transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+                                      hasConsult
+                                        ? "bg-[#b99a6b] border-[#b99a6b] text-[#101820] shadow-sm hover:bg-[#b99a6b]/85"
+                                        : "bg-[#f4f1eb] border-[#101820]/10 text-[#101820]/40 hover:bg-[#b99a6b]/20 hover:text-[#101820]"
+                                    }`}
+                                  >
+                                    <Stethoscope className="w-4 h-4 shrink-0" />
+                                  </button>
+                                );
+                              })()}
 
                               <button
                                 onClick={() => setSelectedBooking(b)}
@@ -2534,12 +2543,11 @@ export default function AdminPage() {
                           ● {b.status.toUpperCase()}
                         </span>
 
-                        {/* Queue number — only patient-booked consultations
-                            are queued; list-only ones aren't in any schedule. */}
-                        {!isListOnlyConsultation(b) && (
+                        {/* Queue number */}
+                        {b.queue_number != null && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#f4f1eb] text-[#101820] text-xs font-medium border border-[#101820]/10">
                             <ListFilter className="w-3.5 h-3.5 text-[#b99a6b]" />
-                            {t("admin.agenda.queue", { number: b.queue_number ?? "—" })}
+                            {t("admin.agenda.queue", { number: b.queue_number })}
                           </span>
                         )}
                       </div>
@@ -2562,44 +2570,39 @@ export default function AdminPage() {
                       </div>
 
                       {/* Date / time / created */}
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-[#101820]/70">
-                        {isListOnlyConsultation(b) ? (
-                          // List-only: an OPTIONAL date the staff can set — it's
-                          // just a note, the consultation stays in this list.
-                          <span className="flex items-center gap-2">
-                            <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" />
-                            {!b.date && <span className="text-[#101820]/45">{t("admin.consultations.noDate")}</span>}
-                            <input
-                              type="date"
-                              value={b.date || ""}
-                              disabled={consultationDateSavingId === b.id}
-                              onChange={(e) => handleSetConsultationDate(b.id, e.target.value)}
-                              className="bg-[#f4f1eb] border border-[#101820]/15 rounded-lg px-2.5 py-1 text-xs text-[#101820] outline-none focus:border-[#b99a6b] disabled:opacity-50"
-                              title={t("admin.consultations.setDate")}
-                            />
-                            {b.date && (
-                              <button
-                                onClick={() => handleSetConsultationDate(b.id, "")}
-                                disabled={consultationDateSavingId === b.id}
-                                className="text-[#101820]/40 hover:text-[#b3452f] transition-colors disabled:opacity-50"
-                                title={t("admin.consultations.clearDate")}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[#101820]/70">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b] shrink-0" />
+                          <span className="font-medium text-[0.72rem] text-[#101820]/60">
+                            {locale === "ar" ? "موعد الاستشارة:" : "Consultation Date:"}
                           </span>
-                        ) : (
-                          <>
-                            <span className="flex items-center gap-1.5">
-                              <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b]" /> {b.date}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Clock3 className="w-3.5 h-3.5 text-[#b99a6b]" /> {formatEstimatedTime(b)}
-                            </span>
-                          </>
+                          <input
+                            type="date"
+                            value={b.date || ""}
+                            disabled={consultationDateSavingId === b.id}
+                            onChange={(e) => handleSetConsultationDate(b.id, e.target.value)}
+                            className="bg-[#f4f1eb] border border-[#101820]/15 rounded-lg px-2.5 py-1 text-xs text-[#101820] outline-none focus:border-[#b99a6b] disabled:opacity-50"
+                            title={t("admin.consultations.setDate")}
+                          />
+                          {b.date && (
+                            <button
+                              onClick={() => handleSetConsultationDate(b.id, "")}
+                              disabled={consultationDateSavingId === b.id}
+                              className="p-1 rounded-md text-[#101820]/40 hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                              title={t("admin.consultations.clearDate")}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        {b.queue_number != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Clock3 className="w-3.5 h-3.5 text-[#b99a6b]" /> {formatEstimatedTime(b, locale)}
+                          </span>
                         )}
-                        <span className="flex items-center gap-1.5 text-[#101820]/45">
-                          <CalendarClock className="w-3.5 h-3.5" /> {t("admin.consultations.requested", { date: formatCreatedAt(b.created_at) })}
+                        <span className="flex items-center gap-1.5 text-[#101820]/50 bg-[#101820]/5 px-2.5 py-1 rounded-md text-[0.7rem]">
+                          <CalendarClock className="w-3.5 h-3.5 text-[#b99a6b] shrink-0" />
+                          <bdi>{t("admin.consultations.requested", { date: formatCreatedAt(b.created_at, locale) })}</bdi>
                         </span>
                       </div>
 
@@ -2970,7 +2973,7 @@ export default function AdminPage() {
                         </span>
                         <span className="text-xs text-[#101820]/40">•</span>
                         <span className="text-xs text-[#101820]/70">
-                          {formatEstimatedTime(visit)}
+                          {formatEstimatedTime(visit, locale)}
                         </span>
                       </div>
 
