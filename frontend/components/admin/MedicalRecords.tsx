@@ -665,7 +665,6 @@ export function MedicalRecords({
                     <option value="">—</option>
                     <option value="male">{t("admin.records.male")}</option>
                     <option value="female">{t("admin.records.female")}</option>
-                    <option value="other">{t("admin.records.other")}</option>
                   </select>
                 </div>
                 <div>

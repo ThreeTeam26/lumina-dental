@@ -18,7 +18,6 @@ import {
   Check,
   ShieldCheck,
   Building2,
-  Sparkles,
   X,
   PhoneCall,
   MessageSquare,
@@ -1495,8 +1494,8 @@ export default function AdminPage() {
         )}
 
         {/* Analytics Cards (hidden on views that have their own layout) */}
-        {viewMode !== "financial" && viewMode !== "records" && viewMode !== "branches" && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {viewMode !== "financial" && viewMode !== "records" && viewMode !== "branches" && viewMode !== "consultations" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white border border-[#101820]/10 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-[#101820]/50">
@@ -1534,19 +1533,6 @@ export default function AdminPage() {
               {stats.confirmed}
             </div>
             <p className="text-[0.7rem] text-emerald-600/70 mt-1">{t("admin.stats.confirmedCaption")}</p>
-          </div>
-
-          <div className="bg-white border border-blue-500/30 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[0.68rem] font-medium uppercase tracking-[0.2em] text-blue-700">
-                {t("admin.stats.completed")}
-              </span>
-              <Sparkles className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="font-serif text-3xl font-medium text-blue-700">
-              {stats.completed}
-            </div>
-            <p className="text-[0.7rem] text-blue-600/70 mt-1">{t("admin.stats.completedCaption")}</p>
           </div>
         </div>
         )}
