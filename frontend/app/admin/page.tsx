@@ -191,6 +191,23 @@ function formatCreatedAt(iso?: string, locale: "en" | "ar" = "en"): string {
   }
 }
 
+/** Formatter for scheduled consultation dates (e.g. "الخميس، 17 سبتمبر 2026") */
+function formatConsultationScheduledDate(isoDate: string, locale: "en" | "ar" = "en"): string {
+  try {
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dateLocale = locale === "ar" ? "ar-EG-u-nu-latn" : "en-US";
+    return dateObj.toLocaleDateString(dateLocale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return isoDate;
+  }
+}
+
 export default function AdminPage() {
   const { t, locale } = useLanguage();
   const [token, setTokenState] = useState<string | null>(null);
@@ -2571,28 +2588,43 @@ export default function AdminPage() {
 
                       {/* Date / time / created */}
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[#101820]/70">
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b] shrink-0" />
-                          <span className="font-medium text-[0.72rem] text-[#101820]/60">
-                            {locale === "ar" ? "موعد الاستشارة:" : "Consultation Date:"}
-                          </span>
-                          <input
-                            type="date"
-                            value={b.date || ""}
-                            disabled={consultationDateSavingId === b.id}
-                            onChange={(e) => handleSetConsultationDate(b.id, e.target.value)}
-                            className="bg-[#f4f1eb] border border-[#101820]/15 rounded-lg px-2.5 py-1 text-xs text-[#101820] outline-none focus:border-[#b99a6b] disabled:opacity-50"
-                            title={t("admin.consultations.setDate")}
-                          />
-                          {b.date && (
-                            <button
-                              onClick={() => handleSetConsultationDate(b.id, "")}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="w-3.5 h-3.5 text-[#b99a6b] shrink-0" />
+                            <span className="font-medium text-[0.72rem] text-[#101820]/60">
+                              {locale === "ar" ? "موعد الاستشارة:" : "Consultation Date:"}
+                            </span>
+                            <input
+                              type="date"
+                              value={b.date || ""}
                               disabled={consultationDateSavingId === b.id}
-                              className="p-1 rounded-md text-[#101820]/40 hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                              title={t("admin.consultations.clearDate")}
+                              onChange={(e) => handleSetConsultationDate(b.id, e.target.value)}
+                              className="bg-[#f4f1eb] border border-[#101820]/15 rounded-lg px-2.5 py-1 text-xs text-[#101820] outline-none focus:border-[#b99a6b] disabled:opacity-50"
+                              title={t("admin.consultations.setDate")}
+                            />
+                            {b.date && (
+                              <button
+                                onClick={() => handleSetConsultationDate(b.id, "")}
+                                disabled={consultationDateSavingId === b.id}
+                                className="p-1 rounded-md text-[#101820]/40 hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                                title={t("admin.consultations.clearDate")}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {b.date && (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-[0.7rem] font-medium"
+                              title={locale === "ar" ? `تم تحديد يوم ${formatConsultationScheduledDate(b.date, locale)} للحضور` : `Scheduled for ${formatConsultationScheduledDate(b.date, locale)}`}
                             >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                              <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>
+                                {locale === "ar"
+                                  ? `تم تحديد يوم ${formatConsultationScheduledDate(b.date, locale)} للحضور`
+                                  : `Scheduled: ${formatConsultationScheduledDate(b.date, locale)}`}
+                              </span>
+                            </span>
                           )}
                         </div>
                         {b.queue_number != null && (
@@ -2697,16 +2729,34 @@ export default function AdminPage() {
                       </div>
 
                       {/* Mark the patient as having attended their consultation —
-                          this saves the attendance and drops it off the list. */}
+                          only enabled on the day of the consultation */}
                       <div className="flex items-center gap-1.5 mt-1">
-                        <button
-                          onClick={() => handleToggleArrival(b)}
-                          disabled={arrivalUpdatingId === b.id}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-600 text-white shadow hover:bg-emerald-700 transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          {arrivalUpdatingId === b.id ? t("admin.common.updating") : t("admin.consultations.markAttended")}
-                        </button>
+                        {(() => {
+                          const todayIso = toLocalIso();
+                          const isTodayConsultation = b.date === todayIso;
+                          const canMarkArrival = isTodayConsultation && arrivalUpdatingId !== b.id;
+                          const tooltipText = !b.date
+                            ? (locale === "ar" ? "حدد موعد الاستشارة أولاً لتفعيل تسجيل الحضور" : "Set consultation date first")
+                            : !isTodayConsultation
+                            ? (locale === "ar" ? `متاح لتسجيل الحضور فقط يوم موعد الاستشارة (${formatConsultationScheduledDate(b.date, locale)})` : `Arrival can only be recorded on the consultation date (${b.date})`)
+                            : undefined;
+
+                          return (
+                            <button
+                              onClick={() => handleToggleArrival(b)}
+                              disabled={!canMarkArrival}
+                              title={tooltipText}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                canMarkArrival
+                                  ? "bg-emerald-600 text-white shadow hover:bg-emerald-700 cursor-pointer"
+                                  : "bg-[#101820]/10 text-[#101820]/40 border border-[#101820]/10 cursor-not-allowed opacity-60"
+                              }`}
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              {arrivalUpdatingId === b.id ? t("admin.common.updating") : t("admin.consultations.markAttended")}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
